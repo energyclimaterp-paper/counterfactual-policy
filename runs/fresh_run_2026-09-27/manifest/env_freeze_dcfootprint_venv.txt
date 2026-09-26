@@ -1,0 +1,2 @@
+# D:\3Gtech_paper - GNN\counterfactual-policy\.venv\Scripts\python.exe
+# Python 3.11.9

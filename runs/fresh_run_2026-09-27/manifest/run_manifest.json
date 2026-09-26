@@ -1,0 +1,75 @@
+{
+  "run": "fresh_run_2026-09-27",
+  "assembled": "2026-09-27T04:27:54",
+  "repos": {
+    "counterfactual-policy": {
+      "path": "D:\\3Gtech_paper - GNN\\counterfactual-policy",
+      "branch": "feat/us-eu",
+      "commit": "f0858fe838b8e9833e186cc42da5f3fab5c25995",
+      "dirty": false
+    },
+    "Co-RE": {
+      "path": "D:\\3Gtech_paper - GNN",
+      "commit": "698a118b3cc20e39f6b7c3b1b941f0e1bbaa6806",
+      "touched": "read-only"
+    }
+  },
+  "environments": {
+    "dcfootprint_venv": "D:\\3Gtech_paper - GNN\\counterfactual-policy\\.venv\\Scripts\\python.exe",
+    "core_python311": "C:\\Users\\samik\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"
+  },
+  "models": {
+    "seasonal_naive": {
+      "repo": "counterfactual-policy",
+      "env": "dcfootprint_venv",
+      "status": "fresh"
+    },
+    "sarima": {
+      "repo": "counterfactual-policy",
+      "env": "dcfootprint_venv",
+      "status": "fresh",
+      "failures": 76
+    },
+    "sarima_core": {
+      "repo": "Co-RE",
+      "env": "core_python311 (original run)",
+      "status": "cached, copied"
+    },
+    "xlstm": {
+      "repo": "Co-RE",
+      "env": "core_python311 (original run)",
+      "status": "cached, copied"
+    },
+    "timesfm-2.5": {
+      "repo": "Co-RE",
+      "env": "core_python311 (original run)",
+      "status": "cached, copied"
+    },
+    "chronos-2": {
+      "repo": "Co-RE",
+      "env": "core_python311 (original run)",
+      "status": "cached, copied",
+      "note": "the cache's 'Nexus' column"
+    },
+    "nexus (real)": {
+      "repo": "Co-RE",
+      "entry": "scripts/run_country_nexus_llm.py",
+      "status": "NOT RUN",
+      "reason": "one gemma4:26b call took 534 s on CPU (3,985 tokens); see RUN_SUMMARY"
+    }
+  },
+  "metrics": [
+    "MAE",
+    "RMSE",
+    "WMAPE_pct",
+    "Bias",
+    "Bias_pct",
+    "MASE",
+    "sMAPE_pct",
+    "MedAE",
+    "Pearson_r",
+    "PICP",
+    "CRPS",
+    "n_prob"
+  ]
+}

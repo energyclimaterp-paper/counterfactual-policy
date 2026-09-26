@@ -1,0 +1,1 @@
+Split by `contrast` from Co-RE outputs_v2/audit/boundary_significance_full.csv (GAT-weighted vs unweighted blending, boundary regions). Copied from cache, not recomputed; 'Nexus' rows there are Chronos-2.

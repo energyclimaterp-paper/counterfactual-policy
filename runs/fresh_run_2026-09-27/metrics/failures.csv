@@ -1,0 +1,77 @@
+model,region,resource,zone,origin,reason
+sarima,India,electricity,Gujarat,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,India,electricity,Himachal Pradesh,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,India,electricity,Nagaland,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,India,electricity,Puducherry,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,India,electricity,Uttarakhand,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,India,carbon,Chandigarh,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,India,carbon,Kerala,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,India,carbon,Lakshadweep,2022-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Arizona,2022-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Arizona,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Arizona,2024-12-01,LinAlgError: LU decomposition error.
+sarima,US,electricity,Arkansas,2023-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,California,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,California,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Florida,2023-12-01,LinAlgError: LU decomposition error.
+sarima,US,electricity,Florida,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Hawaii,2023-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Kansas,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Louisiana,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Louisiana,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Louisiana,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Michigan,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Minnesota,2022-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Minnesota,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Minnesota,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Mississippi,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Nebraska,2022-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Nebraska,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Nevada,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Nevada,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Nevada,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,New York,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,New York,2023-12-01,LinAlgError: LU decomposition error.
+sarima,US,electricity,New York,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,North Dakota,2022-12-01,LinAlgError: LU decomposition error.
+sarima,US,electricity,North Dakota,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Oklahoma,2022-12-01,LinAlgError: LU decomposition error.
+sarima,US,electricity,Oklahoma,2023-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Oklahoma,2024-12-01,LinAlgError: LU decomposition error.
+sarima,US,electricity,Texas,2023-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,electricity,Texas,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Utah,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Utah,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Utah,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Washington,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,West Virginia,2024-12-01,LinAlgError: LU decomposition error.
+sarima,US,electricity,Wisconsin,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Wisconsin,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Wisconsin,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,US,electricity,Wyoming,2024-12-01,LinAlgError: LU decomposition error.
+sarima,US,carbon,Montana,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,US,carbon,Puerto Rico,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Austria,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Austria,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,EU,electricity,Bulgaria,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Bulgaria,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Czechia,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Czechia,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Denmark,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,EU Total,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Finland,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Germany,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Germany,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Germany,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,EU,electricity,Greece,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Greece,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Ireland,2022-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,EU,electricity,Ireland,2023-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,EU,electricity,Poland,2024-12-01,RuntimeError: MLE did not converge in 500 iterations
+sarima,EU,electricity,Portugal,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Romania,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Romania,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Slovakia,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Slovakia,2024-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Slovenia,2023-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)
+sarima,EU,electricity,Sweden,2022-12-01,RuntimeError: degenerate fit (coefficient on the unit boundary or non-finite SE)

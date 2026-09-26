@@ -1,0 +1,25 @@
+{
+  "seasonal_naive": null,
+  "sarima": null,
+  "sarima_core": null,
+  "xlstm": {
+    "seed": 42,
+    "source": "Co-RE partB notebook config (cached run, not re-run here)"
+  },
+  "timesfm-2.5": {
+    "seed": null,
+    "note": "zero-shot inference, deterministic"
+  },
+  "chronos-2": {
+    "seed": null,
+    "note": "cached; Chronos-2 sampling settings per Co-RE run"
+  },
+  "nexus (real, multi-agent)": {
+    "status": "NOT RUN",
+    "planned_backend": "Ollama gemma4:26b",
+    "planned_sampling": {
+      "temperature": 0,
+      "seed": 42
+    }
+  }
+}
