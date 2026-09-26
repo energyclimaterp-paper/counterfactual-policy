@@ -89,7 +89,13 @@ def prepare(account: pd.DataFrame, legal: bool = True, budget_alpha: float | Non
     def mat(col):                                   # F x 12
         return a.pivot(index="facility_id", columns="month", values=col).reindex(A_basin.index).values
 
-    arr = {c: mat(c) for c in ["e_it_mwh", "max_e_it", "u_carbon", "u_carbon_hat", "u_onsite", "u_scarcity"]}
+    a["k_carbon"] = a["u_carbon"] / a["ci_gco2_per_kwh"]                   # tCO2/MWh-IT per gCO2/kWh
+    arr = {c: mat(c) for c in ["e_it_mwh", "max_e_it", "u_carbon", "u_carbon_hat", "u_onsite", "u_scarcity",
+                               "k_carbon"]}
+    zones = sorted(a["zone_id"].unique())
+    zci = lambda col: (a.groupby(["zone_id", "month"])[col].first().unstack().reindex(zones).values)
+    ci_true, ci_hat = zci("ci_gco2_per_kwh"), zci("ci_hat")                 # zone x 12
+    zone_idx = a.groupby("facility_id")["zone_id"].first().reindex(A_basin.index).map(zones.index).values
     arr["banned"] = a.groupby("facility_id")["banned"].first().reindex(A_basin.index).values
     c_mean, s_mean, w_mean = arr["u_carbon"].mean(), arr["u_scarcity"].mean(), max(arr["u_onsite"].mean(), 1e-12)
     lam = float(rp["lambda"])
@@ -111,6 +117,8 @@ def prepare(account: pd.DataFrame, legal: bool = True, budget_alpha: float | Non
         Dfix = np.maximum(Dfix + fixed_w[:, t] - R[:, t], 0.0)
         fixed_peak = np.maximum(fixed_peak, Dfix)
     return {"a": a, "A": A_basin, "arr": arr, "R": R, "R_bar": R_bar, "F": F, "B": B,
+            "zones": zones, "zone_idx": zone_idx, "ci_true": ci_true, "ci_hat": ci_hat,
+            "norms": (c_mean, s_mean, w_mean),
             "fixed_only_peak_queue_m3": float(fixed_peak.max() / 1000.0),
             "budgets": bud, "fixed_w": fixed_w, "alpha": alpha,
             "n_unstabilisable": int((fixed_w.sum(axis=1) > R.sum(axis=1)).sum()),
@@ -131,9 +139,23 @@ def _pools(P: dict, seed: int, noise: float, flex: float) -> np.ndarray:
     return flex * P["arr"]["e_it_mwh"].sum(axis=0) * (1 + noise * rng.standard_normal(12))
 
 
-def simulate(P: dict, policy: str, seed: int = 0, V: float | None = None) -> dict:
+def _agents(P: dict, perfect_foresight: bool):
+    from dcfootprint.routing.agents import BasinAgent, FacilityAgent, GridAgent
+    arr, A = P["arr"], P["A"]
+    grids = [GridAgent(z, (P["ci_true"] if perfect_foresight else P["ci_hat"])[i]) for i, z in enumerate(P["zones"])]
+    basins = [BasinAgent(int(b), P["R"][j], float(P["R_bar"][j])) for j, b in enumerate(A.columns)]
+    bidx = A.values.argmax(axis=1)                                   # each facility sits in one basin
+    facs = [FacilityAgent(fid, int(P["zone_idx"][i]), int(bidx[i]), arr["k_carbon"][i], arr["u_scarcity"][i],
+                          arr["u_onsite"][i], bool(arr["banned"][i])) for i, fid in enumerate(A.index)]
+    return grids, basins, facs
+
+
+def simulate(P: dict, policy: str, seed: int = 0, V: float | None = None, solver: str | None = None) -> dict:
     rp, arr, A = _params(), P["arr"], P["A"].values
     V = float(rp["V"]) if V is None else V
+    solver = rp.get("solver", "price_decomposition") if solver is None else solver
+    if solver == "price_decomposition" and policy != "static":
+        return _simulate_agents(P, policy, seed, V)
     flex = float(rp["flexible_share"])
     pools = _pools(P, seed, float(rp["demand_noise"]), flex)
     D = np.zeros(P["B"])
@@ -155,6 +177,29 @@ def simulate(P: dict, policy: str, seed: int = 0, V: float | None = None) -> dic
         W_b = A.T @ (X[:, t] * arr["u_onsite"][:, t])                         # exact basin load
         D = np.maximum(D + W_b - P["R"][:, t], 0.0)
         Dhist[:, t] = D
+    return _score(P, policy, X, Dhist, pools)
+
+
+def _simulate_agents(P: dict, policy: str, seed: int, V: float) -> dict:
+    """Same controller as simulate(), solved by price decomposition (routing/agents.py)."""
+    from dcfootprint.routing.agents import run_month
+    rp, arr, A = _params(), P["arr"], P["A"].values
+    flex, lam = float(rp["flexible_share"]), float(rp["lambda"])
+    pools = _pools(P, seed, float(rp["demand_noise"]), flex)
+    grids, basins, facs = _agents(P, perfect_foresight=(policy == "lyapunov_pf"))
+    X = np.zeros((P["F"], 12))
+    Dhist = np.zeros((P["B"], 12))
+    use_queue = policy in ("lyapunov", "lyapunov_pf")
+    for t in range(12):
+        fixed = (1 - flex) * arr["e_it_mwh"][:, t]
+        head = np.maximum(arr["max_e_it"][:, t] - fixed, 0.0)
+        head[arr["banned"]] = 0.0
+        add, _ = run_month(t, facs, grids, basins, head, pools[t], V, lam, P["norms"], use_queue)
+        X[:, t] = fixed + add
+        W_b = A.T @ (X[:, t] * arr["u_onsite"][:, t])
+        for j, b in enumerate(basins):
+            b.settle(t, float(W_b[j]))
+        Dhist[:, t] = [b.queue for b in basins]
     return _score(P, policy, X, Dhist, pools)
 
 

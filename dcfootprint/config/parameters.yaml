@@ -157,6 +157,7 @@ regions:
 # ---------------------------------------------------------------------------
 # Q3 ROUTING (L6) — stylised monthly environment.
 routing:
+  solver: price_decomposition   # price_decomposition (agents, routing/agents.py) | central_lp (verification)
   flexible_share: 0.3       # fraction of load that can move between facilities
   max_util: 0.90            # a facility can run up to this utilisation
   V: 1.0                    # drift-plus-penalty weight (swept in v_sweep)
