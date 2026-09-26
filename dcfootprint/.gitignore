@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .snakemake/
 .venv/
+
+# canonical run snapshots keep their outputs (Step 6)
+!results/round*_final/outputs/

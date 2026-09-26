@@ -6,7 +6,7 @@
 
 ## L2 Account
 - 71 facilities x 12 months (2024); grid zone **state** (Ember zone-month CI, mean 596.5 gCO2/kWh).
-- **3,627,533 tCO2/yr**; **24,835,133 m3/yr** physical (scope-1 29%); **846,601,694 m3-eq/yr** scarcity-weighted (scope-1 at facility basin 40%, scope-2 at generation basins 60%).
+- **3,627,533 tCO2/yr**; **24,835,133 m3/yr** physical (scope-1 29%); **844,249,307 m3-eq/yr** scarcity-weighted (scope-1 at facility basin 40%, scope-2 at generation basins 60%).
 
 ## L2.5 Calibration
 - bottom-up 1385.9 MW vs CEEW/JLL [1500.0, 1800.0] -> PASS (consistent) (ratio 0.92).
@@ -22,32 +22,32 @@
 
 ## L6 Q3 Routing (stylised)
 - Budget = alpha x AWARE AMD x basin area: the water left after human consumption and environmental water requirements (AWARE 2.0). Headline alpha = 1, the parameter-free bound. 34 of 96 occupied basin-months have NO water left (AMD <= 0), so any datacenter draw there is an overdraft.
-- vs static, scarcity-water saving: greedy 21.85%, lyapunov 21.7%, oracle 22.27%; carbon change lyapunov -1.44% (negative = more carbon).
-- peak basin overdraft queue: static 778,802 m3, greedy 619,761, lyapunov 545,700; lyapunov penalty is 0.409% above the offline oracle at equal queue peaks.
+- vs static, scarcity-water saving: greedy 21.83%, lyapunov 21.68%, oracle 22.25%; carbon change lyapunov -1.44% (negative = more carbon).
+- peak basin overdraft queue: static 778,802 m3, greedy 619,761, lyapunov 545,700; lyapunov penalty is 0.411% above the offline oracle at equal queue peaks.
 - **Finding: routing alone cannot clear the overdraft.** The non-shiftable load by itself overdraws every basin-month with AMD <= 0, a floor of 545,700 m3 peak overdraft that no router can remove; lyapunov reaches 545,700 m3. Over the full year the budget covers the load in 8/8 basins at alpha=1 (the overdraft is seasonal), falling to 4/8 at alpha=0.0001. Siting and capacity limits are needed, not only load shifting (routing_budget_sweep.csv). *Synthetic demand; conditional on R-hat.*
 
 ## L7 Levers — which lever pays
-- zero_liquid_discharge: 312,727,550 m3-eq/yr (36.9% of scarcity), 0 tCO2/yr (0.0%)
-- efficiency_standard: 309,689,688 m3-eq/yr (36.6% of scarcity), 680,162 tCO2/yr (18.8%)
-- coastal_seawater_siting: 146,527,717 m3-eq/yr (17.3% of scarcity), 0 tCO2/yr (0.0%)
+- zero_liquid_discharge: 312,727,550 m3-eq/yr (37.0% of scarcity), 0 tCO2/yr (0.0%)
+- efficiency_standard: 309,248,616 m3-eq/yr (36.6% of scarcity), 680,162 tCO2/yr (18.8%)
+- coastal_seawater_siting: 146,527,717 m3-eq/yr (17.4% of scarcity), 0 tCO2/yr (0.0%)
 - mandatory_disclosure: 0 m3-eq/yr (0.0% of scarcity), 0 tCO2/yr (0.0%)
 
 ## L7 Q2 Scorecard
 - 71 facilities scored; **16** harm-flagged; recommended levers: {'efficiency_standard': 12, 'zero_liquid_discharge': 4}.
 
 ## L7 Q1 Siting
-- **Headline: 117 candidate state x basin cells on grids >= 10 TWh/yr** (9 already hold a DC), minimax regret over 4 criteria (new facility's scarcity water, carbon, marginal basin overdraft, grid fossil share). Top 5:
-  1. Karnataka basin 47731: CF 4.5, CI 396 g/kWh, 0 overdraft months, rank band 7-27
-  2. Karnataka basin 48720: CF 6.8, CI 396 g/kWh, 0 overdraft months, rank band 8-28
-  3. Karnataka basin 48334: CF 18.4, CI 396 g/kWh, 1 overdraft months, rank band 12-29
-  4. Karnataka basin 48527: CF 19.2, CI 396 g/kWh, 2 overdraft months, rank band 15-32
-  5. Karnataka basin 48907: CF 33.8, CI 396 g/kWh, 4 overdraft months, rank band 17-44
-- Excluded small grids (32 cells, q1_siting_small_grids.csv): own-generation CI (e.g. Mizoram 25 g/kWh) is not what a new load would draw; reported, not recommended.
+- **Headline: 102 candidate state x basin cells on grids >= 10 TWh/yr** (9 already hold a DC), minimax regret over 4 criteria (new facility's scarcity water, carbon, marginal basin overdraft, grid fossil share). Top 5:
+  1. Karnataka basin 47731: CF 4.5, CI 396 g/kWh, 0 overdraft months, rank band 7-22
+  2. Karnataka basin 48334: CF 18.4, CI 396 g/kWh, 1 overdraft months, rank band 8-24
+  3. Karnataka basin 48527: CF 19.2, CI 396 g/kWh, 2 overdraft months, rank band 13-27
+  4. Karnataka basin 48907: CF 33.8, CI 396 g/kWh, 4 overdraft months, rank band 15-38
+  5. Karnataka basin 49090: CF 35.7, CI 396 g/kWh, 4 overdraft months, rank band 16-40
+- Excluded small grids (23 cells, q1_siting_small_grids.csv): own-generation CI (e.g. Mizoram 25 g/kWh) is not what a new load would draw; reported, not recommended.
 
 ## L8 Uncertainty
-- scarcity-weighted water 90% interval (triangular draws, mode = point estimate): 573,454,537 - 1,074,254,628 m3-eq/yr; MC mean = 0.954x the point estimate (WUE band 0.7-2.5 L/kWh, mode 1.9).
-- first-order Sobol: {'util_colocation': 0.646, 'wue': 0.204, 'pue_colocation': 0.057, 'hydro': 0.053, 'ewif': 0.047, 'inference': 0.019}.
-- **Sensitivity variant, no hydro reservoir evaporation:** 719,737,238 m3-eq/yr. The primary figure keeps Macknick 2012's hydro evaporation; attributing multi-purpose reservoir evaporation wholly to power is contested in the literature.
+- scarcity-weighted water 90% interval (triangular draws, mode = point estimate): 571,999,349 - 1,071,360,603 m3-eq/yr; MC mean = 0.954x the point estimate (WUE band 0.7-2.5 L/kWh, mode 1.9).
+- first-order Sobol: {'util_colocation': 0.646, 'wue': 0.205, 'pue_colocation': 0.057, 'hydro': 0.052, 'ewif': 0.047, 'inference': 0.019}.
+- **Sensitivity variant, no hydro reservoir evaporation:** 719,580,813 m3-eq/yr. The primary figure keeps Macknick 2012's hydro evaporation; attributing multi-purpose reservoir evaporation wholly to power is contested in the literature.
 
 
 ### Caveats
@@ -55,4 +55,4 @@
 - state CI is Ember generation-based (R2): small grids that import power show unrepresentative CI.
 - Q3 routing is a stylised controller (synthetic demand, budgets from AWARE AMD) — conditional on R-hat.
 - 10 hyperscale cloud regions excluded — capacity data not publicly disclosed at region level; announced investment figures are multi-year capital commitments, not current operational capacity, and are not used as a proxy. All facilities in the account are colocation. (Operational rows: 129; in account 71; hyperscale regions excluded 10; other rows without capacity 30; costed but no basin 18.)
-- Datacenter coordinates are city-centroids. GEM plant states are GADM 4.1-derived from coordinates, with 3 reviewed overrides; Lower Sileru hydro (Andhra Pradesh | Telangana) is unresolved and excluded from single-state views (config grid.gem_state_*).
+- Coordinates are city-centroids; GEM state tags are used without GADM verification.

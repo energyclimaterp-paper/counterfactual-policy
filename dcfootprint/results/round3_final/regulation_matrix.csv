@@ -1,0 +1,5 @@
+axis,US,EU,India,closest_instrument
+carbon_intensity,No,No,No,"EU CSRD/ESRS E1 (per-revenue, entity-level, narrowed); MN/DE renewable-supply"
+marginal_carbon,No,No,No,"voluntary 24/7 CFE tariffs (consumption, not marginal)"
+scarcity_weighted_water,No,No,No,EU ESRS E3 water-in-stress (entity volume); CA AB2619 (proposed)
+inference_attribution,No,No,No,"EU AI Act Annex XI model energy doc (training, no water/carbon)"

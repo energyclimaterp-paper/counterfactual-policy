@@ -5,30 +5,30 @@
 - **Facilities in account:** 71 (operational, costed, basin-resolved) of 129 operational total — coverage gap = un-costed / un-geocoded.
 - **Total carbon:** 3,627,533 tCO2/yr  (inference-attributed ~3,083,403 tCO2/yr at 85%)
 - **Total physical water:** 24,835,133 m3/yr  (scope-1 on-site 7,221,323 = 29%)
-- **Total scarcity-weighted water:** 846,601,694 m3-eq/yr  *(primary metric)* — scope-1 339,921,250 (40%), scope-2 at generation basins 506,680,444
+- **Total scarcity-weighted water:** 844,249,307 m3-eq/yr  *(primary metric)* — scope-1 339,921,250 (40%), scope-2 at generation basins 504,328,057
 
 ## Scarcity-weighted water by state (top 6)
 
 state
-Tamil Nadu       302,668,480 m3-eq/yr
-Karnataka        177,230,652 m3-eq/yr
-Maharashtra      146,764,956 m3-eq/yr
+Tamil Nadu       302,760,381 m3-eq/yr
+Karnataka        175,867,106 m3-eq/yr
+Maharashtra      146,744,126 m3-eq/yr
 Uttar Pradesh    144,419,911 m3-eq/yr
-Telangana         48,792,556 m3-eq/yr
+Telangana         47,730,230 m3-eq/yr
 West Bengal       11,856,416 m3-eq/yr
 
 
 ## Top 8 facilities by scarcity-weighted water
 
          operator          city         state  capacity_mw  carbon_tco2_yr  water_scarcity_m3eq_yr
-    NTT GDC India     Bengaluru     Karnataka        67.20   168433.486664            7.649261e+07
-   Techno Digital       Chennai    Tamil Nadu        36.00   113398.477978            5.273991e+07
-      AdaniConneX       Chennai    Tamil Nadu        33.00   103948.604813            4.834492e+07
-  Nxtra by Airtel       Chennai    Tamil Nadu        27.00    85048.858483            3.955493e+07
-    STT GDC India       Chennai    Tamil Nadu        26.00    81898.900762            3.808993e+07
+    NTT GDC India     Bengaluru     Karnataka        67.20   168433.486664            7.590411e+07
+   Techno Digital       Chennai    Tamil Nadu        36.00   113398.477978            5.275592e+07
+      AdaniConneX       Chennai    Tamil Nadu        33.00   103948.604813            4.835960e+07
+  Nxtra by Airtel       Chennai    Tamil Nadu        27.00    85048.858483            3.956694e+07
+    STT GDC India       Chennai    Tamil Nadu        26.00    81898.900762            3.810150e+07
             Yotta Greater Noida Uttar Pradesh        30.00   145019.725056            3.664860e+07
              Sify         Noida Uttar Pradesh        25.92   125297.042448            3.166439e+07
-Digital Connexion       Chennai    Tamil Nadu        20.00    62999.154432            2.929995e+07
+Digital Connexion       Chennai    Tamil Nadu        20.00    62999.154432            2.930885e+07
 
 
 ### Caveats (v2)
