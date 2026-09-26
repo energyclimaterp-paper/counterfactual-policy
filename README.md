@@ -1,9 +1,5 @@
 # Counterfactual Policy Analysis of AI-Datacenter Carbon & Water — India / US / EU
 
-Open, reproducible research framework for a Q1 paper submitted to the Elsevier special issue
-*Energy and Climate Change — "Computing and Digitalization through a Multi-Disciplinary Lens"*
-(deadline 31 Dec 2026; IPCC-AR7-aligned).
-
 ## What it does
 A deterministic pipeline — **account → project → counterfactual → policy-gap**:
 1. **Account** — a sub-national, facility-level, **joint carbon + scarcity-weighted-water** account of AI
