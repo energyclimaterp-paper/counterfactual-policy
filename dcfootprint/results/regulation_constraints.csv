@@ -1,0 +1,8 @@
+jurisdiction,region,rule,type
+India,Rajasthan,ZLD + recharge mandatory,hard
+India,Gujarat,>=51% renewable energy,hard
+EU,Germany,PUE<=1.2 new (2026),hard
+EU,Ireland,>=80% additional RE; locational test,hard
+EU,Netherlands,hyperscale ban (>10ha & >=70MW),hard
+EU,EU-wide,EED/2024-1364 PUE+WUE reporting >=500kW,soft
+US,Minnesota,RE/carbon-free supply; >100Mgal water permit,hard

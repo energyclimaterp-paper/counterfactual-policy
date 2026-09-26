@@ -58,9 +58,14 @@ class EmberZoneMonth(pa.DataFrameModel):
 class BasinMonthlyCF(pa.DataFrameModel):
     """AWARE native CFs — basin x 12 climatological months (NOT year-specific).
     Join to facilities is SPATIAL (point-in-polygon on the gpkg), by Basin_ID."""
-    basin_id: Series["Int64"] = pa.Field(unique=True)
+    basin_id: Series["Int64"]
     month: Series[int] = pa.Field(ge=1, le=12)
     cf: Series[float] = pa.Field(ge=0, le=100)   # AWARE capped at 100
+
+    @pa.dataframe_check
+    def unique_basin_month(cls, df: pd.DataFrame) -> bool:
+        """Long table: one row per (basin, month) — basin_id repeats across months."""
+        return not df.duplicated(subset=["basin_id", "month"]).any()
 
     class Config:
         coerce = True

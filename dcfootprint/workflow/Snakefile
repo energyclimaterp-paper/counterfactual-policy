@@ -1,88 +1,25 @@
-# dcfootprint pipeline DAG (Snakemake) — one-command reproducibility (the contribution).
-# Mirrors the L0-L7 architecture: a sequential SPINE + parallel TRACKS.
-# Run:  snakemake -c4 all            (all)   |   snakemake -c4 floor   (India Floor only)
+# dcfootprint reproducible pipeline (Snakemake).
 #
-# SPINE (critical path):  facilities -> geo_join -> account -> counterfactual
-# PARALLEL TRACKS:        carbon_panel + water_coeff (data) ; policy ; forecast(Ceiling)
-# Every rule's output is validated by pandera (validation/schemas.py) before it is written.
-
-configfile: "config/parameters.yaml"
-
-OUT = "outputs"
-REGIONS_FLOOR = ["India"]
-REGIONS_ALL   = ["India", "US", "EU"]
+# The TESTED, one-command end-to-end entrypoint is the Python orchestrator:
+#     PYTHONPATH=dcfootprint/src python -m dcfootprint.pipeline
+# which runs L0->L9 (facilities -> geo -> account -> calibrate -> forecast ->
+# recharge -> counterfactual -> policy-gap -> routing -> Q2 -> Q1 -> uncertainty),
+# validates every boundary with pandera, and writes dcfootprint/results/.
+#
+# This DAG delegates to that orchestrator so `snakemake` and the module runner
+# stay in lock-step (no drift). Run from the dcfootprint/ directory.
 
 rule all:
-    input: f"{OUT}/account_facility_month.parquet",
-           f"{OUT}/counterfactual_lever_savings.csv",
-           f"{OUT}/regulatory_gap_matrix.csv",
-           f"{OUT}/uncertainty_bands.parquet"
+    """Run the full L0-L9 pipeline and materialise dcfootprint/results/."""
+    shell:
+        "PYTHONPATH=src python -m dcfootprint.pipeline"
 
-rule floor:                       # a complete, submittable India-only paper
-    input: f"{OUT}/account_facility_month_india.parquet",
-           f"{OUT}/counterfactual_lever_savings_india.csv"
-
-# ---- L0 data foundation (parallel track A) --------------------------------
-rule load_ember:                  # carbon + fuel-mix panel (zone-month)
-    output: f"{OUT}/interim/ember_zone_month.parquet"
-    run:
-        from dcfootprint.io import ember
-        ember.build_zone_month_panel(config).to_parquet(output[0])   # -> EmberZoneMonth schema
-
-rule load_aware:                  # scarcity CFs + basin polygons
-    output: f"{OUT}/interim/aware_basins.gpkg"
-    run:
-        from dcfootprint.io import aware; aware.load(config, output[0])
-
-# ---- L1 spatial linkage (SPINE) -------------------------------------------
-rule facilities:                  # merge our-list + ATLAS coords + CEA plant data
-    output: f"{OUT}/interim/facilities.parquet"
-    run:
-        from dcfootprint.io import facilities; facilities.build(config).to_parquet(output[0])
-
-rule geo_join:                    # facility -> zone_id (GADM) + basin_id (AWARE point-in-polygon)
-    input:  fac=rules.facilities.output, aware=rules.load_aware.output
-    output: f"{OUT}/interim/facilities_geocoded.parquet"
-    run:
-        from dcfootprint.geo import join; join.assign_zone_and_basin(config, input.fac, input.aware).to_parquet(output[0])
-
-# ---- L2 account (SPINE) ---------------------------------------------------
 rule account:
-    input:  fac=rules.geo_join.output, carbon=rules.load_ember.output, aware=rules.load_aware.output
-    output: f"{OUT}/account_facility_month.parquet"
-    run:
-        from dcfootprint.account import build
-        acct = build.facility_month_account(config, input.fac, input.carbon, input.aware)
-        from dcfootprint.validation import schemas
-        schemas.FacilityMonthAccount.validate(acct)          # contract enforced HERE
-        acct.to_parquet(output[0])
+    """Just the deterministic account spine (L0-L2), contract-validated."""
+    shell:
+        "PYTHONPATH=src python -m dcfootprint.account.build"
 
-# ---- L3 counterfactual (SPINE — the working headline) ---------------------
-rule counterfactual:
-    input:  rules.account.output
-    output: f"{OUT}/counterfactual_lever_savings.csv"
-    run:
-        from dcfootprint.counterfactual import levers
-        levers.rank_lever_savings(config, input[0]).to_csv(output[0], index=False)
-
-# ---- L5 policy (parallel track B) -----------------------------------------
-rule regulatory_gap:
-    output: f"{OUT}/regulatory_gap_matrix.csv"
-    run:
-        from dcfootprint.policy import gap; gap.four_axis_matrix(config).to_csv(output[0], index=False)
-
-# ---- L3 PROJECT — forward projection / TIME-SERIES layer (Ceiling) ---------
-# grid-CI = real time-series forecast (SARIMA/Chronos, backtested); growth + scarcity = scenarios.
-rule project:
-    input:  account=rules.account.output, carbon=rules.load_ember.output
-    output: f"{OUT}/account_projected.parquet"
-    run:
-        from dcfootprint.project import build
-        build.to_2030(config, input.account, input.carbon).to_parquet(output[0])
-
-# ---- L6 uncertainty (cross-cutting) ---------------------------------------
-rule uncertainty:
-    input:  rules.account.output
-    output: f"{OUT}/uncertainty_bands.parquet"
-    run:
-        from dcfootprint.uncertainty import mc; mc.monte_carlo(config, input[0]).to_parquet(output[0])
+rule routing:
+    """Just the Q3 Lyapunov routing comparison (Ceiling)."""
+    shell:
+        "PYTHONPATH=src python -m dcfootprint.routing.lyapunov"

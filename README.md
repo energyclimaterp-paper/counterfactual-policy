@@ -29,8 +29,11 @@ granularity, join key, and retrieval path is documented in **[`context/DATA.md`]
 pipeline retrieves them into `data/` (git-ignored).
 
 ## Status
-Architecture designed, scaffolded, and red-teamed; data acquired + validated. **Empirical build pending**
-(next: the gate experiments in `dcfootprint/ARCHITECTURE.md §6.4`, then the facility-layer build).
+**Pipeline built and runs end-to-end (L0–L9)** — one command:
+`PYTHONPATH=dcfootprint/src python -m dcfootprint.pipeline`.
+Account (pandera-validated) → calibration → grid-CI forecast → counterfactual levers → policy-gap →
+Q3 Lyapunov routing → Q1 siting → Q2 harm-scorecard → uncertainty; outputs in `dcfootprint/results/`.
+India Floor complete on real data; US/EU tiers, legal-RAG, and the GNN-spillover arm are Ceiling.
 
 ## Stack
 Python · pandas/geopandas · pandera (data contracts) · pint (units) · Snakemake (reproducible DAG) ·
