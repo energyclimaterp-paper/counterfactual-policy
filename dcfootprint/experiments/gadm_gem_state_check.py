@@ -23,17 +23,7 @@ import yaml
 
 from dcfootprint.io.facilities import _repo_root
 
-# GEM / Ember spelling -> set of acceptable GADM 4.1 NAME_1 values
-ALIASES = {
-    "Delhi": {"NCT of Delhi"},
-    "National Capital Territory of Delhi": {"NCT of Delhi"},
-    "Andaman and Nicobar Islands": {"Andaman and Nicobar"},
-    "Dadra and Nagar Haveli and Daman and Diu": {"Dadra and Nagar Haveli", "Daman and Diu"},
-    "Ladakh": {"Jammu and Kashmir"},
-    "Orissa": {"Odisha"},
-    "Pondicherry": {"Puducherry"},
-    "Uttaranchal": {"Uttarakhand"},
-}
+from dcfootprint.io.gem import GADM_ALIASES as ALIASES   # one alias table, shared with the pipeline
 BORDER_KM = 5.0
 
 

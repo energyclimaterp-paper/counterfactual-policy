@@ -239,7 +239,9 @@ def _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard
              f"(Operational rows: {meta.get('n_operational_total', '?')}; in account {meta.get('n_facilities', '?')}; "
              f"hyperscale regions excluded {meta.get('n_hyperscale_regions_excluded', '?')}; other rows without capacity "
              f"{meta.get('n_operational_uncosted_other', '?')}; costed but no basin {meta.get('n_operational_no_basin', '?')}.)\n"
-             "- Coordinates are city-centroids; GEM state tags are used without GADM verification.")
+             "- Datacenter coordinates are city-centroids. GEM plant states are GADM 4.1-derived from coordinates, with 3 "
+             "reviewed overrides; Lower Sileru hydro (Andhra Pradesh | Telangana) is unresolved and excluded from "
+             "single-state views (config grid.gem_state_*).")
     (RES / "RESULTS_FULL.md").write_text("\n\n".join(L), encoding="utf-8")
     return RES / "RESULTS_FULL.md"
 

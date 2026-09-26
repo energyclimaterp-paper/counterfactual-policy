@@ -71,6 +71,15 @@ grid:
   zone: state
   account_year: 2024
   gem_path: "data/gem/Global-Integrated-Power-March-2026-II.xlsx"
+  gadm_path: "data/gadm/gadm41_IND.gpkg"     # GADM 4.1, layer ADM_ADM_1, field NAME_1
+  # GEM plant state of record = GADM from coordinates (io/gem.assign_state_of_record), except
+  # these reviewed cases from results/gem_gadm_state_mismatches.csv (decision 2026-09-27):
+  gem_state_overrides:
+    G100000800551: {state: Karnataka, note: "Vijaypura (Adani) II - GEM coordinates (26.84N 77.10E) fall in Rajasthan 911 km out; sister farms I/III are in Karnataka; coordinate error, label kept, coordinate NOT corrected"}
+    G100000108490: {state: Chhattisgarh, note: "Rawan Cement - GEM coordinates fall in Rajasthan 693 km out; coordinate error, label kept, coordinate NOT corrected"}
+    G100000833894: {state: Gujarat, note: "Gujarat (Adani) IV Hybrid - coordinates at Khavda, Gujarat; GEM label Rajasthan treated as the error"}
+  gem_state_ambiguous:
+    G100000601967: "Lower Sileru hydro - GEM Andhra Pradesh | GADM Telangana (8.8 km from the AP polygon); unresolved, no single-state assignment"
   # GEM 'Type' -> Ember fuel (the Macknick coefficient key)
   gem_type_to_fuel:
     coal: Coal
@@ -173,7 +182,6 @@ siting:
   new_facility_mw: 50       # size S of the hypothetical new facility
   new_facility_type: colocation
   weight_samples: 500
-  min_plants_per_cell: 2    # GEM state tags are occasionally wrong; single-plant cells are dropped (existing-DC cells kept)
   small_grid_twh: 10        # states generating < this (TWh/yr) are flagged: their own-generation CI is not what a DC would draw
   # candidate cells = (state x AWARE basin) cells holding >=1 operating GEM plant,
   # plus every cell that already holds a datacenter

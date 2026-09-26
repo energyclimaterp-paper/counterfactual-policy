@@ -47,10 +47,7 @@ def candidate_cells(account: pd.DataFrame, g: dict) -> pd.DataFrame:
     dc = account.groupby(["state", "basin_id"], as_index=False).agg(n_existing_dc=("facility_id", "nunique"))
     dc["basin_id"] = dc["basin_id"].astype("int64")
     cells = grid_cells.merge(dc, on=["state", "basin_id"], how="outer").fillna({"n_plants": 0, "n_existing_dc": 0})
-    # guard against GEM state/coordinate mismatches (e.g. a plant tagged Karnataka at 26.8N 77.1E)
-    # until GADM gives state from coordinates: a grid cell needs >= min_plants_per_cell plants
-    min_p = int(_cfg()["siting"].get("min_plants_per_cell", 2))
-    cells = cells[(cells["n_plants"] >= min_p) | (cells["n_existing_dc"] > 0)]
+    # GEM plant states are GADM-verified (io/gem.assign_state_of_record); no plant-count guard
     cells = cells[cells["state"].isin(set(g["ci"]["zone_id"]))]             # needs a grid CI
     return cells.astype({"basin_id": "int64", "n_plants": int, "n_existing_dc": int})
 
