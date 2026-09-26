@@ -44,7 +44,8 @@ def _cfg() -> dict:
 def candidate_cells(account: pd.DataFrame, g: dict) -> pd.DataFrame:
     p = g["plants"].dropna(subset=["state"])
     grid_cells = p.groupby(["state", "basin_id"], as_index=False).agg(n_plants=("plant", "size"))
-    dc = account.groupby(["state", "basin_id"], as_index=False).agg(n_existing_dc=("facility_id", "nunique"))
+    dc = (account.dropna(subset=["basin_id"])                      # EU (country tier) has no facility basins
+          .groupby(["state", "basin_id"], as_index=False).agg(n_existing_dc=("facility_id", "nunique")))
     dc["basin_id"] = dc["basin_id"].astype("int64")
     cells = grid_cells.merge(dc, on=["state", "basin_id"], how="outer").fillna({"n_plants": 0, "n_existing_dc": 0})
     # GEM plant states are GADM-verified (io/gem.assign_state_of_record); no plant-count guard
@@ -59,7 +60,9 @@ def score_cells(account: pd.DataFrame, legal: bool = True) -> pd.DataFrame:
     from dcfootprint.project.recharge import basin_budgets
     cfg = _cfg()
     sc, gcfg = cfg["siting"], cfg["grid"]
-    g = grid_tables(gcfg["zone"], int(gcfg["account_year"]))
+    region = str(account["region"].iloc[0])
+    year = int(cfg["region_config"][region]["account_year"])
+    g = grid_tables(gcfg["zone"], year, region)
     cells = candidate_cells(account, g)
 
     t = sc["new_facility_type"]
@@ -67,7 +70,7 @@ def score_cells(account: pd.DataFrame, legal: bool = True) -> pd.DataFrame:
     util = cfg["energy"]["utilisation"]["by_facility_type"][t]["default"]
     pue0 = cfg["energy"]["pue"]["by_facility_type"][t]["default"]
     wue = float(cfg["water_onsite"]["wue_default"]["default"])
-    hrs = month_hours(int(gcfg["account_year"]))
+    hrs = month_hours(year)
     e_it = hrs.assign(e_it_mwh=S * util * hrs["hours"])[["month", "e_it_mwh"]]          # MWh-IT per month
 
     cf = g["basin_cf"][g["basin_cf"]["basin_id"].isin(cells["basin_id"])]
@@ -109,7 +112,7 @@ def score_cells(account: pd.DataFrame, legal: bool = True) -> pd.DataFrame:
     # marginal basin pressure: Delta D_b = rise in the peak queue D(t+1) = (D + W - R)^+ over a
     # steady year (one spin-up year), with vs without the new facility's scope-1 draw
     cyc = []
-    exist_m = (account.assign(basin_id=account["basin_id"].astype("int64"))
+    exist_m = (account.dropna(subset=["basin_id"]).pipe(lambda d: d.assign(basin_id=d["basin_id"].astype("int64")))
                .groupby(["basin_id", "month"])["water_onsite_l"].sum())
     bud = basin_budgets(cells["basin_id"].unique(), 1.0).set_index(["basin_id", "month"])["budget_l"]
     new_m = (e_it.set_index("month")["e_it_mwh"] * 1000 * wue)                        # L per month
@@ -129,9 +132,9 @@ def score_cells(account: pd.DataFrame, legal: bool = True) -> pd.DataFrame:
     # R2 guard: a state's Ember CI is its OWN generation; a small grid that imports most of its
     # power (e.g. hydro-only NE states) shows a CI the datacenter would not actually see.
     from dcfootprint.io import ember
-    raw = ember.load_india_raw()
+    raw = ember.load_raw(region)
     gen = raw[(raw["Category"] == "Electricity generation") & (raw["Unit"] == "GWh")
-              & (raw["Variable"].isin(ember._FUELS)) & (raw["date"].dt.year == int(gcfg["account_year"]))]
+              & (raw["Variable"].isin(ember._FUELS)) & (raw["date"].dt.year == year)]
     twh = gen.groupby("State")["Value"].sum() / 1000.0
     cells["state_generation_twh"] = cells["state"].map(twh).round(2)
     cells["small_grid"] = cells["state_generation_twh"] < float(sc.get("small_grid_twh", 10))

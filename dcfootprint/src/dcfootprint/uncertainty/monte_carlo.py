@@ -76,7 +76,10 @@ def _draw(rng, lo, mode, hi, n, dist):
     return rng.triangular(lo, min(max(mode, lo), hi), hi, n)
 
 
-def monte_carlo(account: pd.DataFrame, n: int | None = None, seed: int = 0, distribution: str | None = None) -> dict:
+def monte_carlo(account: pd.DataFrame, n: int | None = None, seed: int = 0, distribution: str | None = None,
+                measured: bool = False) -> dict:
+    """measured=True (EU): energy and on-site water are REPORTED, so util/PUE/WUE are not
+    sampled (held at 1); only EWIF, hydro and the inference share vary."""
     comp = _components(account)
     b = _bands()
     n = b["n_samples"] if n is None else n
@@ -87,6 +90,8 @@ def monte_carlo(account: pd.DataFrame, n: int | None = None, seed: int = 0, dist
         ranges[f"util_{t}"] = b["util"].get(t, b["util"]["unknown"])
         ranges[f"pue_{t}"] = b["pue"].get(t, b["pue"]["unknown"])
     ranges.update({"wue": b["wue"], "ewif": b["ewif"], "hydro": b["hydro"], "inference": b["inference"]})
+    if measured:
+        ranges = {k: ((1.0, 1.0) if k.startswith(("util_", "pue_")) or k == "wue" else v) for k, v in ranges.items()}
     base = {k: 1.0 for k in ranges} | {"inference": b["inference_default"]}   # point-estimate values
     s = {k: _draw(rng, lo, base[k], hi, n, dist) for k, (lo, hi) in ranges.items()}
     tot = _totals(comp, s)
@@ -102,7 +107,7 @@ def monte_carlo(account: pd.DataFrame, n: int | None = None, seed: int = 0, dist
     sobol = {k: round(_first_order(s[k], tot["scarcity_inference"]), 3) for k in ranges}
     point = _totals(comp, base)
     return {
-        "n_samples": n, "distribution": dist,
+        "n_samples": n, "distribution": dist, "measured_energy_and_water": measured,
         "point_scarcity_m3eq_yr": round(float(point["scarcity"]), 0),
         "facility_types": {t: int(account.loc[account["facility_type"] == t, "facility_id"].nunique()) for t in comp.index},
         "carbon_tco2_yr": ci(tot["carbon"]),

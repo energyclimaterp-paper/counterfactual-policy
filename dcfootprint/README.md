@@ -94,6 +94,17 @@ data/aware/AWARE20_Native_CFs_geospatial.gpkg
 data/g3p/G3P_v1.12_tws_rivbas.csv
 data/gem/Global-Integrated-Power-March-2026-II.xlsx      (India subset cached as parquet on first run)
 data/cea/CEA_Database_V22.xlsx                           (optional: cross-check only)
+data/gadm/gadm41_IND.gpkg, gadm41_USA.gpkg                  (GADM 4.1; layer ADM_ADM_1)
+data/ember/us_monthly_full_release_long_format.csv, europe_monthly_full_release_long_format.csv
+data/aware/AWARE20_Intermediate_Variables.xlsx, AWARE20_Countries_and_Regions.xlsx
+data/compute_atlas/facilities_v1.34.0.json                 (US spine; Compute Atlas release v1.34.0, CC BY 4.0)
+data/epoch/data_centers.csv                                (Epoch AI, optional cross-check)
+data/eu_eed/EU_DC_assessment_first_technical_report_2025-07.pdf  (source of config/eu_member_state_2023.csv)
 ```
 The Co-RE forecast benchmark is read from `$DCF_GAT_DIR`, else `gat-based-forecasting/diff/gat-sarima-nexus`,
 else `../diff/gat-sarima-nexus`. Its "Nexus" rows are **Chronos-2 in the Nexus slot** and are reported under that label.
+
+## Regions
+`python -m dcfootprint.pipeline` runs India (facility tier). `python -m dcfootprint.regions US EU` runs
+the US (facility tier, Compute Atlas) and the EU (country tier, EED Member State aggregates for 2023);
+outputs go to `results/us/` and `results/eu/`. Q3 routing is not run for the EU (no site locations).

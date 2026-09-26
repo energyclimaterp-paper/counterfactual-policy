@@ -15,7 +15,7 @@ import pandas as pd
 def scorecard(account: pd.DataFrame) -> pd.DataFrame:
     from dcfootprint.counterfactual.levers import facility_lever_savings
     from dcfootprint.policy.gap import HARD_CONSTRAINTS
-    ann = account.groupby(["facility_id", "operator", "city", "state", "basin_id"], as_index=False).agg(
+    ann = account.groupby(["facility_id", "operator", "city", "state", "basin_id"], as_index=False, dropna=False).agg(  # EU: no basin/city
         carbon_tco2_yr=("carbon_tco2", "sum"),
         water_phys_m3_yr=("water_phys_l", lambda s: s.sum() / 1000.0),
         scarcity_m3eq_yr=("water_scarcity_l_eq", lambda s: s.sum() / 1000.0),

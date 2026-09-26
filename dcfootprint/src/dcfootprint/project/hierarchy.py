@@ -30,7 +30,6 @@ import pandas as pd
 
 from dcfootprint.io import ember
 
-NATIONAL = "India Total"
 METHODS = ("seasonal_naive", "bottom_up", "mint_wls_var", "mint_wls_struct")
 BACKTEST_YEARS = (2022, 2023)
 
@@ -100,11 +99,12 @@ def _mint(base_total: float, base_bottom: np.ndarray, w: np.ndarray) -> np.ndarr
 
 
 @lru_cache(maxsize=32)
-def onestep_ci(year: int, zone: str = "state", method: str = "bottom_up") -> tuple[pd.DataFrame, pd.DataFrame]:
+def onestep_ci(year: int, zone: str = "state", method: str = "bottom_up", region: str = "India") -> tuple[pd.DataFrame, pd.DataFrame]:
     """(ci_hat [zone_id, month, ci_hat, ci_hat_source], diagnostics per series)."""
     if method not in METHODS:
         raise ValueError(f"unknown method {method!r}")
-    raw = ember.load_india_raw()
+    raw = ember.load_raw(region)
+    NATIONAL = ember.national_of(raw)
     panel = _panel(raw)
     states = [c for c in panel["generation"].columns if c != NATIONAL]
     if method == "seasonal_naive":
@@ -141,24 +141,24 @@ def onestep_ci(year: int, zone: str = "state", method: str = "bottom_up") -> tup
     return pd.DataFrame(rows), pd.DataFrame(diag)
 
 
-def _rmse(year: int, method: str, zones, zone: str = "state") -> float:
-    ci_hat, _ = onestep_ci(year, zone, method)
-    truth = ember.zone_month_ci(ember.load_india_raw(), year, zone)
+def _rmse(year: int, method: str, zones, zone: str = "state", region: str = "India") -> float:
+    ci_hat, _ = onestep_ci(year, zone, method, region)
+    truth = ember.zone_month_ci(ember.load_raw(region), year, zone)
     d = truth.merge(ci_hat, on=["zone_id", "month"])
     d = d[d["zone_id"].isin(zones)]
     return float(np.sqrt(np.mean((d["ci_hat"] - d["ci_gco2_per_kwh"]) ** 2)))
 
 
-def backtest_methods(zones, account_year: int, zone: str = "state") -> tuple[pd.DataFrame, str]:
+def backtest_methods(zones, account_year: int, zone: str = "state", region: str = "India") -> tuple[pd.DataFrame, str]:
     """RMSE per method in each backtest year (selection) and in the account year (out-of-sample
     check only). Returns (table, chosen_method) under the pre-registered rule."""
     rows = []
     for m in METHODS:
         r = {"method": m}
         for y in BACKTEST_YEARS:
-            r[f"rmse_{y}"] = _rmse(y, m, zones, zone)
+            r[f"rmse_{y}"] = _rmse(y, m, zones, zone, region)
         r["rmse_backtest_mean"] = float(np.mean([r[f"rmse_{y}"] for y in BACKTEST_YEARS]))
-        r[f"rmse_{account_year}_out_of_sample"] = _rmse(account_year, m, zones, zone)
+        r[f"rmse_{account_year}_out_of_sample"] = _rmse(account_year, m, zones, zone, region)
         rows.append(r)
     tab = pd.DataFrame(rows)
     best = tab.loc[tab["rmse_backtest_mean"].idxmin(), "method"]
@@ -176,26 +176,28 @@ def _cache_dir():
     return _repo_root() / "data" / "ember"
 
 
-def _fresh(path) -> bool:
-    src = _cache_dir() / "india_monthly_full_release_long_format.csv"
+def _fresh(path, region: str = "India") -> bool:
+    src = _cache_dir() / ember.EMBER_FILES[region]          # each region's cache depends on its own Ember file
     return path.exists() and path.stat().st_mtime >= src.stat().st_mtime
 
 
-def chosen_onestep_ci(zones: tuple, account_year: int, zone: str = "state") -> tuple[pd.DataFrame, pd.DataFrame, str]:
+def chosen_onestep_ci(zones: tuple, account_year: int, zone: str = "state",
+                      region: str = "India") -> tuple[pd.DataFrame, pd.DataFrame, str]:
     """(ci_hat for the account year from the pre-registered method, backtest table, method).
     Both are cached next to the Ember file (derived data, rebuilt when Ember or CACHE_VERSION changes)."""
     d = _cache_dir()
-    tab_p = d / f"ci_method_backtest_{account_year}_{zone}_{CACHE_VERSION}.csv"
-    if _fresh(tab_p):
+    tag = "" if region == "India" else f"{region.lower()}_"            # India keeps its existing cache names
+    tab_p = d / f"ci_method_backtest_{tag}{account_year}_{zone}_{CACHE_VERSION}.csv"
+    if _fresh(tab_p, region):
         tab = pd.read_csv(tab_p)
     else:
-        tab, _ = backtest_methods(list(zones), account_year, zone)
+        tab, _ = backtest_methods(list(zones), account_year, zone, region)
         tab.to_csv(tab_p, index=False)
     method = str(tab.loc[tab["chosen"], "method"].iloc[0])
-    ci_p = d / f"ci_onestep_{method}_{account_year}_{zone}_{CACHE_VERSION}.parquet"
-    if _fresh(ci_p):
+    ci_p = d / f"ci_onestep_{tag}{method}_{account_year}_{zone}_{CACHE_VERSION}.parquet"
+    if _fresh(ci_p, region):
         ci = pd.read_parquet(ci_p)
     else:
-        ci = onestep_ci(account_year, zone, method)[0]
+        ci = onestep_ci(account_year, zone, method, region)[0]
         ci.to_parquet(ci_p)
     return ci, tab, method

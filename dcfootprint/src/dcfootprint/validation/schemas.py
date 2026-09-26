@@ -81,7 +81,8 @@ class GemPlants(pa.DataFrameModel):
     longitude: Series[float] = pa.Field(ge=-180, le=180)
     basin_id: Series["Int64"]
     state: Series[str] = pa.Field(nullable=True)          # NaN only for 'ambiguous'
-    state_source: Series[str] = pa.Field(isin=["gadm_agrees", "gadm", "override", "ambiguous", "gem_label_outside_gadm"])
+    state_source: Series[str] = pa.Field(isin=["gadm_agrees", "gadm", "override", "ambiguous",
+                                               "gem_label_outside_gadm", "country"])
 
     @pa.dataframe_check
     def only_ambiguous_has_no_state(cls, df: pd.DataFrame) -> bool:

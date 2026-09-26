@@ -20,26 +20,38 @@ _COLS = {"GEM unit/phase ID": "plant_id", "Type": "type", "Plant / Project name"
 _FOSSIL = {"coal", "oil/gas"}
 
 
-def load_plants(country: str = "India", status: str = "operating", path: str | Path | None = None) -> pd.DataFrame:
-    """[type, plant, capacity_mw, status, latitude, longitude, state, fossil] for one country."""
+def region_plants(region: str = "India", status: str = "operating") -> pd.DataFrame:
+    """GEM plants of every country in region_config[region].gem_countries, state of record assigned."""
+    rc = _cfg_params()["region_config"][region]
+    return assign_state_of_record(load_plants(list(rc["gem_countries"]), status, tag=region, assign=False), region)
+
+
+def load_plants(country="India", status: str = "operating", path: str | Path | None = None,
+                tag: str | None = None, assign: bool = True) -> pd.DataFrame:
+    """[plant_id, type, plant, capacity_mw, status, latitude, longitude, gem_state, country, fossil]
+    for one country or a list (cached per `tag`); India state of record assigned if assign."""
     root = _repo_root()
     if path is None:
         params = _cfg_params()
         path = root / params["grid"]["gem_path"]
     path = Path(path)
-    cache = path.with_name(f"gem_{country.lower()}_{status}_v2.parquet")
+    countries = [country] if isinstance(country, str) else list(country)
+    tag = tag or countries[0]
+    cache = path.with_name(f"gem_{tag.lower().replace(' ', '_')}_{status}_v4.parquet")
     if cache.exists() and cache.stat().st_mtime >= path.stat().st_mtime:
-        return assign_state_of_record(pd.read_parquet(cache))
+        g = pd.read_parquet(cache)
+        return assign_state_of_record(g) if assign else g
     g = pd.read_excel(path, sheet_name="Power facilities", usecols=["Country/area", *_COLS])
-    g = g[(g["Country/area"] == country) & (g["Status"] == status)].rename(columns=_COLS)
-    g = g.drop(columns="Country/area")
+    g = g[g["Country/area"].isin(countries) & (g["Status"] == status)].rename(columns=_COLS)
+    g = g.rename(columns={"Country/area": "country"})
     g["capacity_mw"] = pd.to_numeric(g["capacity_mw"], errors="coerce")
     g["latitude"] = pd.to_numeric(g["latitude"], errors="coerce")
     g["longitude"] = pd.to_numeric(g["longitude"], errors="coerce")
-    g = g.dropna(subset=["capacity_mw", "latitude", "longitude"]).reset_index(drop=True)
+    g = g.dropna(subset=["capacity_mw", "latitude", "longitude"])
+    g = g[g["capacity_mw"] > 0].reset_index(drop=True)   # 0-MW 'operating' units (seen in EU) carry no weight
     g["fossil"] = g["type"].isin(_FOSSIL)
     g.to_parquet(cache)
-    return assign_state_of_record(g)
+    return assign_state_of_record(g) if assign else g
 
 
 # --------------------------------------------------------------------------- #
@@ -57,15 +69,16 @@ GADM_ALIASES = {
     "Pondicherry": {"Puducherry"},
     "Uttaranchal": {"Uttarakhand"},
 }
-# GADM / GEM spelling -> Ember state name (the pipeline's zone key)
-_TO_EMBER = {"NCT of Delhi": "Delhi", "National Capital Territory of Delhi": "Delhi",
+US_GADM_ALIASES = {"Arizona and Nevada": {"Arizona", "Nevada"}}
+# GADM / GEM spelling -> Ember zone name (the pipeline's zone key)
+_TO_EMBER = {"District of Columbia": "Washington, D.C.", "Czech Republic": "Czechia","NCT of Delhi": "Delhi", "National Capital Territory of Delhi": "Delhi",
              "Andaman and Nicobar Islands": "Andaman and Nicobar",
              "Dadra and Nagar Haveli": "Dadra and Nagar Haveli and Daman and Diu",
              "Daman and Diu": "Dadra and Nagar Haveli and Daman and Diu",
              "Orissa": "Odisha", "Pondicherry": "Puducherry", "Uttaranchal": "Uttarakhand"}
 
 
-def assign_state_of_record(plants: pd.DataFrame) -> pd.DataFrame:
+def assign_state_of_record(plants: pd.DataFrame, region: str = "India") -> pd.DataFrame:
     """Add state (the pipeline's), gadm_state, state_source, state_note.
     Rules, in order:
       1. grid.gem_state_overrides[plant_id]           -> that state            (override)
@@ -79,11 +92,18 @@ def assign_state_of_record(plants: pd.DataFrame) -> pd.DataFrame:
     import geopandas as gpd
     root = _repo_root()
     gcfg = _cfg_params()["grid"]
+    rc = _cfg_params()["region_config"][region]
+    p = plants.copy()
+    if rc["tier"] == "country":                      # EU: the zone IS the plant's country
+        p["gadm_state"] = None
+        p["state"] = p["country"].map(lambda c: _TO_EMBER.get(c, c))
+        p["state_source"], p["state_note"] = "country", ""
+        return p
     overrides = {str(k): v for k, v in (gcfg.get("gem_state_overrides") or {}).items()}
     ambiguous = {str(k): v for k, v in (gcfg.get("gem_state_ambiguous") or {}).items()}
-    adm1 = gpd.read_file(root / gcfg["gadm_path"], layer="ADM_ADM_1")[["NAME_1", "geometry"]]
+    aliases = {**GADM_ALIASES, **US_GADM_ALIASES}
+    adm1 = gpd.read_file(root / rc["gadm_path"], layer="ADM_ADM_1")[["NAME_1", "geometry"]]
 
-    p = plants.copy()
     pts = gpd.GeoDataFrame(p[["plant_id"]], crs="EPSG:4326",
                            geometry=gpd.points_from_xy(p["longitude"], p["latitude"]))
     j = gpd.sjoin(pts, adm1, how="left", predicate="within")
@@ -94,7 +114,7 @@ def assign_state_of_record(plants: pd.DataFrame) -> pd.DataFrame:
 
     state, source, note = [], [], []
     for pid, gem_l, gadm_s in zip(p["plant_id"].astype(str), p["gem_state"], p["gadm_state"]):
-        agrees = isinstance(gadm_s, str) and gadm_s in GADM_ALIASES.get(gem_l, {gem_l})
+        agrees = isinstance(gadm_s, str) and gadm_s in aliases.get(gem_l, {gem_l})
         if pid in overrides:
             state.append(ember(overrides[pid]["state"])); source.append("override")
             note.append(overrides[pid].get("note", ""))
@@ -102,6 +122,8 @@ def assign_state_of_record(plants: pd.DataFrame) -> pd.DataFrame:
             state.append(None); source.append("ambiguous"); note.append(ambiguous[pid])
         elif not isinstance(gadm_s, str):
             state.append(ember(gem_l)); source.append("gem_label_outside_gadm"); note.append("")
+        elif agrees and gem_l in US_GADM_ALIASES:      # compound label (e.g. Hoover Dam): coordinates pick the state
+            state.append(ember(gadm_s)); source.append("gadm_agrees"); note.append(f"GEM label: {gem_l}")
         elif agrees:
             state.append(ember(gem_l)); source.append("gadm_agrees"); note.append("")
         else:

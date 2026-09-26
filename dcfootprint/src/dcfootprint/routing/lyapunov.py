@@ -47,9 +47,10 @@ def _ci_forecast(account: pd.DataFrame) -> pd.Series:
     """One-step CI forecast per row from the L3 pre-registered method (project/hierarchy.py:
     chosen on 2022-2023 one-step backtests over the datacenter states; cached)."""
     from dcfootprint.project.hierarchy import chosen_onestep_ci
-    p = _cfg_params()["grid"]
+    P = _cfg_params()
+    region = str(account["region"].iloc[0])
     zones = tuple(sorted(account["zone_id"].astype(str).unique()))
-    ci, _, _ = chosen_onestep_ci(zones, int(p["account_year"]), p["zone"])
+    ci, _, _ = chosen_onestep_ci(zones, int(P["region_config"][region]["account_year"]), P["grid"]["zone"], region)
     m = account[["zone_id", "month"]].merge(ci[["zone_id", "month", "ci_hat"]], on=["zone_id", "month"], how="left")
     return m["ci_hat"].fillna(account["ci_gco2_per_kwh"].reset_index(drop=True)).values
 

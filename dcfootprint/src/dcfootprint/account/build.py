@@ -35,19 +35,19 @@ def load_params() -> dict:
     return _cfg_params()
 
 
-@lru_cache(maxsize=4)
-def grid_tables(zone: str, year: int) -> dict:
+@lru_cache(maxsize=8)
+def grid_tables(zone: str, year: int, region: str = "India") -> dict:
     """Zone-month grid inputs shared by the account, routing and siting:
     ci [zone_id, month, ci_gco2_per_kwh, ci_source], grid_water [zone_id, month, ewif...,
     sewif...], plants (GEM operating, with basin_id), fuel_cf."""
     from dcfootprint.geo import join as gj, generation_basins as gb
     params = load_params()
-    raw = ember.load_india_raw()
+    raw = ember.load_raw(region)
     ci = ember.zone_month_ci(raw, year, zone)
     shares = ember.zone_month_fuel_shares(raw, year, zone)
     basins = gj.load_aware_basins()
     cf = gj.basin_monthly_cf(basins)
-    plants = gb.plant_basins(gem.load_plants("India"), basins)
+    plants = gb.plant_basins(gem.region_plants(region), basins)
     fuel_cf = gb.fuel_basin_cf(plants, cf, params["grid"]["gem_type_to_fuel"], zone)
     gw = gb.zone_month_grid_water(shares, fuel_cf, params["water_grid"]["ewif_coeff_L_per_MWh"], zone)
     from dcfootprint.validation import schemas
@@ -67,22 +67,43 @@ def _wue_by_facility_id(fac: pd.DataFrame, params: dict) -> dict:
     return dict(zip(fac["facility_id"], wue))
 
 
-def facility_month_account(config: dict | None = None) -> pd.DataFrame:
+def facility_month_account(config: dict | None = None, region: str = "India") -> pd.DataFrame:
+    """Facility-month account for a facility-tier region (India, US)."""
     params = load_params()
     root = _repo_root()
-    zone, year = params["grid"]["zone"], int(params["grid"]["account_year"])
+    zone = params["grid"]["zone"]
+    year = int(params["region_config"][region]["account_year"])
+    if region == "India":
+        fac = pd.read_parquet(root / "dcfootprint" / "outputs" / "interim" / "facilities_geocoded.parquet")
+        acct_fac = fac[(fac["status"] == "Operational") & fac["capacity_mw"].notna() & fac["basin_id"].notna()].copy()
+        n_op_total = int((fac["status"] == "Operational").sum())
+        # Hyperscale cloud regions are EXCLUDED (decision 2026-09-27): no region-level capacity is
+        # publicly disclosed; announced investment figures are multi-year capital commitments, not
+        # operational MW, and are not used as a proxy. They drop out via capacity_mw = NaN; counted here.
+        op = fac[fac["status"] == "Operational"]
+        hyperscale_regions = op["operator_family"].fillna("").str.contains("hyperscale", case=False)
+        extra_meta = {
+            "n_hyperscale_regions_excluded": int(hyperscale_regions.sum()),
+            "n_hyperscale_regions_with_capacity": int((hyperscale_regions & op["capacity_mw"].notna()).sum()),
+            "n_operational_uncosted_other": int((~hyperscale_regions & op["capacity_mw"].isna()).sum()),
+            "n_operational_no_basin": int((op["capacity_mw"].notna() & op["basin_id"].isna()).sum()),
+        }
+    elif region == "US":
+        from dcfootprint.io import us_facilities
+        from dcfootprint.geo import join as gj
+        spine = us_facilities.build()
+        fac = gj.assign_basin(spine, gj.load_aware_basins())
+        acct_fac = fac[fac["basin_id"].notna()].copy()
+        n_op_total = int(spine.attrs["meta"]["n_operational_datacenters"])
+        extra_meta = {"us_capacity_basis": spine.attrs["meta"]["basis_counts"],
+                      "us_unspecified_basis_treated_as": spine.attrs["meta"]["unspecified_as"],
+                      "n_operational_uncosted": n_op_total - int(spine.attrs["meta"]["n_with_capacity"]),
+                      "n_costed_no_basin": int(fac["basin_id"].isna().sum())}
+    else:
+        raise ValueError(f"facility_month_account: region {region!r} is not facility-tier")
 
-    fac = pd.read_parquet(root / "dcfootprint" / "outputs" / "interim" / "facilities_geocoded.parquet")
-    acct_fac = fac[(fac["status"] == "Operational") & fac["capacity_mw"].notna() & fac["basin_id"].notna()].copy()
-    n_op_total = int((fac["status"] == "Operational").sum())
-    # Hyperscale cloud regions are EXCLUDED (decision 2026-09-27): no region-level capacity is
-    # publicly disclosed; announced investment figures are multi-year capital commitments, not
-    # operational MW, and are not used as a proxy. They drop out via capacity_mw = NaN; counted here.
-    op = fac[fac["status"] == "Operational"]
-    hyperscale_regions = op["operator_family"].fillna("").str.contains("hyperscale", case=False)
-
-    g = grid_tables(zone, year)
-    cf = pd.read_parquet(root / "dcfootprint" / "outputs" / "interim" / "basin_cf_monthly.parquet")
+    g = grid_tables(zone, year, region)
+    cf = g["basin_cf"].copy()
 
     e = energy_mod.energy_account(acct_fac, params, year)
     e["zone_id"] = e["state"].astype(str)
@@ -111,7 +132,7 @@ def facility_month_account(config: dict | None = None) -> pd.DataFrame:
 
     e["inference_share"] = float(params["inference"]["sectoral_share"]["default"])
     e["date"] = e["month"].map(lambda m: pd.Timestamp(year, int(m), 1))
-    e["region"] = "India"
+    e["region"] = region
 
     keep = _CONTRACT_COLS + ["state", "zone_id", "basin_id", "facility_type", "capacity_mw", "operator", "city",
                              "cf", "cf_grid_eff", "ci_gco2_per_kwh", "ci_source", "pue", "wue_l_per_kwh",
@@ -124,11 +145,9 @@ def facility_month_account(config: dict | None = None) -> pd.DataFrame:
     account.attrs["meta"] = {
         "account_year": year, "grid_zone": zone,
         "ci_mean_gco2_per_kwh": round(float((account["carbon_tco2"].sum() * 1000) / account["e_grid_mwh"].sum()), 1),
+        "region": region,
         "n_facilities": int(acct_fac["facility_id"].nunique()), "n_operational_total": n_op_total,
-        "n_hyperscale_regions_excluded": int(hyperscale_regions.sum()),
-        "n_hyperscale_regions_with_capacity": int((hyperscale_regions & op["capacity_mw"].notna()).sum()),
-        "n_operational_uncosted_other": int((~hyperscale_regions & op["capacity_mw"].isna()).sum()),
-        "n_operational_no_basin": int((op["capacity_mw"].notna() & op["basin_id"].isna()).sum()),
+        **extra_meta,
         "dropped_facility_months_no_cf": missing_cf,
         "ci_state_fill_months": int((account["ci_source"] != "ember_state").sum()) if zone == "state" else 0,
     }

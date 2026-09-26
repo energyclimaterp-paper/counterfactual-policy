@@ -1,4 +1,4 @@
-"""L0 — Ember India monthly. Two products for the account:
+"""L0 — Ember monthly (India / US / EU, load_raw). Two products for the account:
   * national monthly FUEL SHARES -> scope-2 EWIF (via Macknick coeffs).
   * national monthly CO2 INTENSITY (generation-based) -> the *flagged sensitivity*
     carbon source (the primary India carbon is CEA national-annual; see io/cea.py).
@@ -21,11 +21,64 @@ _FUELS = ["Coal", "Gas", "Nuclear", "Bioenergy", "Hydro", "Solar", "Wind",
           "Other Fossil", "Other Renewables"]
 
 
-def load_india_raw(path: str | Path | None = None) -> pd.DataFrame:
-    path = Path(path) if path else _repo_root() / "data" / "ember" / "india_monthly_full_release_long_format.csv"
+EMBER_FILES = {"India": "india_monthly_full_release_long_format.csv",
+               "US": "us_monthly_full_release_long_format.csv",
+               "EU": "europe_monthly_full_release_long_format.csv"}
+
+
+def load_raw(region: str = "India", path: str | Path | None = None) -> pd.DataFrame:
+    """Ember monthly release for a region, normalised to ONE long format and unit set:
+    columns State, date, Category, Variable, Unit, Value; generation in GWh, emissions in
+    ktCO2, intensity labelled gCO2/kWh; the aggregate row named '<X> Total'
+      India  as released (states + 'India Total'; 'Others' is not a zone)
+      US     as released (states incl. 'Washington, D.C.' + 'US Total')
+      EU     country-level release filtered to the EU-27 members; the Ember 'EU' region row
+             becomes 'EU Total'. Ember Europe reports TWh / MtCO2e / gCO2e per kWh: converted
+             (x1000) and relabelled — note the EU emissions are CO2-EQUIVALENT (flagged)."""
+    path = Path(path) if path else _repo_root() / "data" / "ember" / EMBER_FILES[region]
     df = pd.read_csv(path)
     df["date"] = pd.to_datetime(df["Date"])
+    if region == "EU":
+        member = df["EU"].astype(str).str.lower().isin(["true", "1", "1.0"])
+        countries = df["Area type"].eq("Country or economy") & member
+        agg = df["Area"].eq("EU") & df["Area type"].eq("Region")
+        df = df[countries | agg].copy()
+        df["State"] = df["Area"].where(~agg, "EU Total")
+        conv = {"TWh": ("GWh", 1000.0), "MtCO2e": ("ktCO2", 1000.0), "gCO2e per kWh": ("gCO2/kWh", 1.0)}
+        for u, (new, k) in conv.items():
+            m = df["Unit"].eq(u)
+            df.loc[m, "Value"] = df.loc[m, "Value"] * k
+            df.loc[m, "Unit"] = new
+        # Ember Europe splits fuels finer than India/US: fold onto the 9-fuel set (lignite takes
+        # the coal EWIF coefficient — flagged), and build 'Total emissions' as the fuel sum.
+        fuel_map = {"Hard coal": "Coal", "Lignite": "Coal", "Onshore wind": "Wind", "Offshore wind": "Wind",
+                    "Other fossil": "Other Fossil", "Other renewables": "Other Renewables"}
+        df["Variable"] = df["Variable"].replace({"Total generation": "Total Generation"})
+        fuel = df["Subcategory"].eq("Fuel") & df["Unit"].isin(["GWh", "ktCO2"])
+        f = df[fuel].assign(Variable=lambda d: d["Variable"].replace(fuel_map))
+        keys = ["State", "date", "Date", "Category", "Subcategory", "Variable", "Unit"]
+        f = f.groupby(keys, as_index=False)["Value"].sum()
+        tot_em = (f[f["Category"].eq("Power sector emissions")].groupby(["State", "date", "Date"], as_index=False)["Value"].sum()
+                  .assign(Category="Power sector emissions", Subcategory="Total", Variable="Total emissions", Unit="ktCO2"))
+        df = pd.concat([df[~fuel & ~df["Unit"].eq("%")], f, tot_em], ignore_index=True)
     return df
+
+
+def load_india_raw(path: str | Path | None = None) -> pd.DataFrame:
+    return load_raw("India", path)
+
+
+def national_of(raw: pd.DataFrame) -> str:
+    """The aggregate row's name ('India Total', 'US Total', 'EU Total')."""
+    tot = [x for x in raw["State"].dropna().unique() if str(x).endswith(" Total")]
+    if len(tot) != 1:
+        raise ValueError(f"expected one '<X> Total' row, found {tot}")
+    return tot[0]
+
+
+def zones_of(raw: pd.DataFrame) -> list[str]:
+    nat = national_of(raw)
+    return sorted(z for z in raw["State"].dropna().unique() if z not in {nat, "Others"})
 
 
 def national_monthly_fuel_shares(raw: pd.DataFrame) -> pd.DataFrame:
@@ -34,7 +87,7 @@ def national_monthly_fuel_shares(raw: pd.DataFrame) -> pd.DataFrame:
     gen = raw[(raw["Category"] == "Electricity generation")
               & (raw["Variable"].isin(_FUELS))
               & (raw["Unit"] == "GWh")].copy()
-    national = gen[gen["State"] == "India Total"]           # exact national row
+    national = gen[gen["State"] == national_of(raw)]        # exact national row
     if national.empty:                                       # fallback: sum states (skip 'total' to avoid double-count)
         national = gen[gen["State type"].isin(["state", "Union territory"])]
     nat = (national.groupby(["date", "Variable"], as_index=False)["Value"].sum()
@@ -48,7 +101,7 @@ def national_monthly_fuel_shares(raw: pd.DataFrame) -> pd.DataFrame:
 def national_monthly_ci(raw: pd.DataFrame) -> pd.DataFrame:
     """[date, ci_gco2_per_kwh] — generation-based national CI (flagged sensitivity)."""
     ci = raw[(raw["Variable"] == "CO2 intensity") & (raw["Unit"] == "gCO2/kWh")].copy()
-    national = ci[ci["State"] == "India Total"]
+    national = ci[ci["State"] == national_of(raw)]
     if national.empty:
         national = ci
     return (national.groupby("date", as_index=False)["Value"].mean()
@@ -71,10 +124,8 @@ def monthly_ewif_l_per_mwh(shares: pd.DataFrame, ewif_coeff: dict[str, float]) -
 
 
 # --------------------------------------------------------------------------- #
-# Zone-month tables (zone = Ember state, or the India total for every state)
+# Zone-month tables (zone = Ember state/country, or the aggregate for every zone)
 # --------------------------------------------------------------------------- #
-_NATIONAL = "India Total"
-_NOT_A_STATE = {_NATIONAL, "Others"}
 
 
 def zone_month_ci(raw: pd.DataFrame, year: int, zone: str = "state") -> pd.DataFrame:
@@ -84,9 +135,9 @@ def zone_month_ci(raw: pd.DataFrame, year: int, zone: str = "state") -> pd.DataF
     ci = raw[(raw["Variable"] == "CO2 intensity") & (raw["Unit"] == "gCO2/kWh")
              & (raw["date"].dt.year == year)].copy()
     ci["month"] = ci["date"].dt.month
-    nat = (ci[ci["State"] == _NATIONAL].groupby("month")["Value"].mean()
+    nat = (ci[ci["State"] == national_of(raw)].groupby("month")["Value"].mean()
            .rename("ci_national"))
-    states = sorted(s for s in raw["State"].dropna().unique() if s not in _NOT_A_STATE)
+    states = zones_of(raw)
     grid = pd.MultiIndex.from_product([states, range(1, 13)], names=["zone_id", "month"]).to_frame(index=False)
     grid = grid.merge(nat, on="month", how="left")
     if zone == "state":
@@ -117,8 +168,8 @@ def zone_month_fuel_shares(raw: pd.DataFrame, year: int, zone: str = "state") ->
         g["share"] = g["Value"] / g.groupby([key, "month"])["Value"].transform("sum")
         return g.rename(columns={key: "zone_id", "Variable": "fuel"})[["zone_id", "month", "fuel", "share"]]
 
-    nat = _shares(gen[gen["State"] == _NATIONAL], "State").drop(columns="zone_id")
-    states = sorted(s for s in raw["State"].dropna().unique() if s not in _NOT_A_STATE)
+    nat = _shares(gen[gen["State"] == national_of(raw)], "State").drop(columns="zone_id")
+    states = zones_of(raw)
     if zone == "national":
         out = pd.concat([nat.assign(zone_id=s) for s in states], ignore_index=True)
         out["share_source"] = "ember_national"

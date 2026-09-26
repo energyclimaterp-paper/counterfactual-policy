@@ -195,3 +195,28 @@ uncertainty:
   # WUE band is [0.7, 2.5] with mode 1.9 (see water_onsite.wue_default for sources).
   distribution: triangular
   n_samples: 4000
+
+# ---------------------------------------------------------------------------
+# REGIONS (L0/L1 inputs per region; the India block mirrors grid.* above)
+region_config:
+  India:
+    tier: facility
+    account_year: 2024
+    gem_countries: [India]
+    gadm_path: "data/gadm/gadm41_IND.gpkg"
+  US:
+    tier: facility
+    account_year: 2024
+    gem_countries: [United States]
+    gadm_path: "data/gadm/gadm41_USA.gpkg"
+    compute_atlas_path: "data/compute_atlas/facilities_v1.34.0.json"   # pinned release v1.34.0 (CC BY 4.0)
+  EU:
+    tier: country            # facility data confidential under Reg (EU) 2024/1364
+    account_year: 2023       # first EED reporting period covers calendar 2023
+    gem_countries: [Austria, Belgium, Bulgaria, Croatia, Cyprus, Czech Republic, Denmark, Estonia, Finland,
+                    France, Germany, Greece, Hungary, Ireland, Italy, Latvia, Lithuania, Luxembourg, Malta,
+                    Netherlands, Poland, Portugal, Romania, Slovakia, Slovenia, Spain, Sweden]
+    eu_eed_path: "dcfootprint/config/eu_member_state_2023.csv"   # rebuilt by experiments/extract_eu_tables.py
+    aware_country_path: "data/aware/AWARE20_Countries_and_Regions.xlsx"
+    aware_country_sheet: CFs_nonagri     # non-agricultural use = industrial/datacenter water
+
