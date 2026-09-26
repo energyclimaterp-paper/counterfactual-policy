@@ -149,13 +149,17 @@ routing:
   lambda: 1.0               # scarcity water vs carbon weight (both normalised to mean 1)
   demand_noise: 0.05
   seeds: 10
-  # Basin water budget R_hat_b(m), DECOUPLED from datacenter use:
-  #   R_hat_b(m) = kappa * g3p_seasonal(m) / mean_month CF_b
-  # AWARE CF = world-average / basin availability-minus-demand, so 1/CF is proportional to the
-  # water remaining per area in that basin. kappa is ONE global scalar, set so the sum of
-  # budgets = budget_scale x total baseline scope-1 water. Basin queues track SCOPE-1 water
-  # only (scope-2 is drawn at power-plant basins, not the facility's basin).
-  budget_scale: 1.0
+  # Basin water budget R_hat_b(m), DECOUPLED from datacenter use and taken from AWARE 2.0
+  # (Seitfudem et al. 2025, doi:10.5281/zenodo.15133241):
+  #   R_hat_b(m) = alpha * max(AMD_b(m), 0) * area_b
+  # AMD = water available minus human consumption minus environmental water requirements
+  # (EWR), per area and month. alpha = 1 is the parameter-free headline: datacenters may not
+  # draw more than the water left after people and environmental flows; any draw in a month
+  # with AMD <= 0 is an overdraft. Smaller alpha = a smaller sector share (budget_sweep).
+  # Basin queues track SCOPE-1 water only (scope-2 is drawn at power-plant basins).
+  budget_alpha: 1.0
+  budget_sweep_alpha: [1.0, 0.01, 0.001, 0.0001]
+  aware_intermediate_path: "data/aware/AWARE20_Intermediate_Variables.xlsx"
 
 # ---------------------------------------------------------------------------
 # Q1 SITING (L7).
@@ -167,3 +171,13 @@ siting:
   small_grid_twh: 10        # states generating < this (TWh/yr) are flagged: their own-generation CI is not what a DC would draw
   # candidate cells = (state x AWARE basin) cells holding >=1 operating GEM plant,
   # plus every cell that already holds a datacenter
+
+# ---------------------------------------------------------------------------
+# L8 UNCERTAINTY
+uncertainty:
+  # triangular = mode at the point estimate, support = the sourced band (a best estimate exists)
+  # uniform    = every value in the band equally likely (reported alongside as a sensitivity)
+  # NB the WUE upper bound 9 L/kWh is sourced (Li et al., "Making AI Less Thirsty": on-site WUE
+  # 0.01-9 L/kWh) but spans extreme sites/seasons, not annual fleet averages -> asymmetric tail.
+  distribution: triangular
+  n_samples: 4000

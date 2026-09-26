@@ -6,7 +6,8 @@ minimise carbon + scarcity-weighted water, while a per-basin water queue
 keeps any basin from being drawn beyond its budget. W_b = A_basin^T (x * u_onsite) is the
 EXACT basin load through the incidence matrix (geo/incidence.py, architecture L4 core);
 queues track scope-1 water only, since scope-2 is drawn at power-plant basins.
-R_hat_b is decoupled from datacenter use (project/recharge.basin_budgets).
+R_hat_b = alpha * max(AWARE AMD, 0) * area: water left after human use and environmental
+flows (project/recharge.basin_budgets), decoupled from datacenter use.
 
 Policies
   static       proportional to headroom (the floor)
@@ -24,7 +25,7 @@ Legal hard limits (policy/gap.region_effects) apply when legal=True: ZLD mandate
 scope-1 water, renewable-share mandates cut carbon, bans stop added load.
 
 This is a STYLISED environment (synthetic seasonal demand, an assumed flexible share,
-budgets from AWARE+G3P); results are conditional on R_hat (v2 L6).
+budgets from AWARE AMD); results are conditional on R_hat (v2 L6).
 """
 from __future__ import annotations
 
@@ -52,7 +53,7 @@ def _ci_forecast(account: pd.DataFrame) -> pd.Series:
     return m["ci_gco2_per_kwh"].fillna(account["ci_gco2_per_kwh"].reset_index(drop=True)).values
 
 
-def prepare(account: pd.DataFrame, legal: bool = True, budget_scale: float | None = None) -> dict:
+def prepare(account: pd.DataFrame, legal: bool = True, budget_alpha: float | None = None) -> dict:
     """Facility x month arrays (facilities sorted by id) + incidence + budgets."""
     from dcfootprint.geo.incidence import build_incidence
     from dcfootprint.policy.gap import region_effects
@@ -96,14 +97,24 @@ def prepare(account: pd.DataFrame, legal: bool = True, budget_scale: float | Non
     arr["cost_hat"] = arr["u_carbon_hat"] / c_mean + lam * arr["u_scarcity"] / s_mean
     arr["w_norm"] = arr["u_onsite"] / w_mean
 
-    total_onsite = float((arr["e_it_mwh"] * arr["u_onsite"]).sum())
-    scale = float(rp["budget_scale"]) if budget_scale is None else budget_scale
-    bud = basin_budgets(A_basin.columns, scale * total_onsite)
+    alpha = float(rp["budget_alpha"]) if budget_alpha is None else budget_alpha
+    bud = basin_budgets(A_basin.columns, alpha)
     R = bud.pivot(index="basin_id", columns="month", values="budget_l").reindex(A_basin.columns).values   # B x 12
     fixed_w = A_basin.values.T @ ((1 - float(rp["flexible_share"])) * arr["e_it_mwh"] * arr["u_onsite"])
-    return {"a": a, "A": A_basin, "arr": arr, "R": R, "R_bar": R.mean(axis=1), "F": F, "B": B,
-            "budgets": bud, "fixed_w": fixed_w,
-            "n_unstabilisable": int((fixed_w.sum(axis=1) > R.sum(axis=1)).sum())}
+    # queue price scale = the basin's mean monthly DC scope-1 draw: a backlog of one month of the
+    # basin's own datacenter use costs ~1 (same order as the normalised carbon+scarcity cost).
+    # This scales the CONTROLLER only; the budget R itself stays independent of DC use.
+    w_bar = A_basin.values.T @ (arr["e_it_mwh"] * arr["u_onsite"])
+    R_bar = np.maximum(w_bar.mean(axis=1), 1e-9)
+    Dfix, fixed_peak = np.zeros(B), np.zeros(B)                        # overdraft no router can remove
+    for t in range(12):
+        Dfix = np.maximum(Dfix + fixed_w[:, t] - R[:, t], 0.0)
+        fixed_peak = np.maximum(fixed_peak, Dfix)
+    return {"a": a, "A": A_basin, "arr": arr, "R": R, "R_bar": R_bar, "F": F, "B": B,
+            "fixed_only_peak_queue_m3": float(fixed_peak.max() / 1000.0),
+            "budgets": bud, "fixed_w": fixed_w, "alpha": alpha,
+            "n_unstabilisable": int((fixed_w.sum(axis=1) > R.sum(axis=1)).sum()),
+            "overdraft_basin_months": int((R <= 0).sum())}
 
 
 def _lp_month(cost, head, pool):
@@ -137,7 +148,7 @@ def simulate(P: dict, policy: str, seed: int = 0, V: float | None = None) -> dic
         else:
             cost = V * (arr["cost_true"][:, t] if policy == "lyapunov_pf" else arr["cost_hat"][:, t])
             if policy in ("lyapunov", "lyapunov_pf"):
-                q = D / np.maximum(P["R_bar"], 1e-12)                        # backlog in months of budget
+                q = D / P["R_bar"]                                           # backlog in months of basin DC draw
                 cost = cost + (A @ q) * arr["w_norm"][:, t]
             add = _lp_month(cost, head, pools[t])
         X[:, t] = fixed + add
@@ -205,10 +216,10 @@ def _score(P, policy, X, Dhist, pools):
 
 
 def compare(account: pd.DataFrame, seeds: int | None = None, legal: bool = True,
-            budget_scale: float | None = None) -> pd.DataFrame:
+            budget_alpha: float | None = None) -> pd.DataFrame:
     rp = _params()
     seeds = int(rp["seeds"]) if seeds is None else seeds
-    P = prepare(account, legal=legal, budget_scale=budget_scale)
+    P = prepare(account, legal=legal, budget_alpha=budget_alpha)
     runs = []
     for s in range(seeds):
         for pol in ["static", "greedy", "lyapunov", "lyapunov_pf"]:
@@ -231,6 +242,9 @@ def compare(account: pd.DataFrame, seeds: int | None = None, legal: bool = True,
     out["seeds"] = seeds
     out.attrs["n_unstabilisable_basins"] = P["n_unstabilisable"]
     out.attrs["n_basins"] = P["B"]
+    out.attrs["overdraft_basin_months"] = P["overdraft_basin_months"]
+    out.attrs["budget_alpha"] = P["alpha"]
+    out.attrs["fixed_only_peak_queue_m3"] = P["fixed_only_peak_queue_m3"]
     return out
 
 
@@ -248,12 +262,15 @@ def v_sweep(account: pd.DataFrame, seeds: int | None = None) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def budget_sweep(account: pd.DataFrame, scales=(0.5, 1.0, 2.0, 4.0), seeds: int = 5) -> pd.DataFrame:
-    """Q3 is conditional on R_hat: how the comparison moves with the budget scale."""
+def budget_sweep(account: pd.DataFrame, alphas=None, seeds: int = 5) -> pd.DataFrame:
+    """Q3 is conditional on R_hat: how the comparison moves with the sector share alpha."""
+    alphas = _params()["budget_sweep_alpha"] if alphas is None else alphas
     rows = []
-    for sc in scales:
-        r = compare(account, seeds=seeds, legal=True, budget_scale=sc).set_index("policy")
-        rows.append({"budget_scale": sc, "unstabilisable_basins": r.attrs["n_unstabilisable_basins"],
+    for al in alphas:
+        r = compare(account, seeds=seeds, legal=True, budget_alpha=float(al)).set_index("policy")
+        rows.append({"budget_alpha": al, "unstabilisable_basins": r.attrs["n_unstabilisable_basins"],
+                     "overdraft_basin_months": r.attrs["overdraft_basin_months"],
+                     "fixed_only_peak_queue_m3": r.attrs["fixed_only_peak_queue_m3"],
                      "n_basins": r.attrs["n_basins"],
                      "greedy_scarcity_saving_pct": r.loc["greedy", "scarcity_saving_pct_vs_static"],
                      "lyapunov_scarcity_saving_pct": r.loc["lyapunov", "scarcity_saving_pct_vs_static"],

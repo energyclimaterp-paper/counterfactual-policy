@@ -21,9 +21,10 @@
 - **100%** of burden in a regulatory blind spot; axes mandated anywhere: 0/4. Evidence: RAG corpus of 15 cited policy docs (12 in force) across 10 jurisdictions — the regulated perimeter, none mandating the four axes.
 
 ## L6 Q3 Routing (stylised)
-- vs static, scarcity-water saving: greedy 21.83%, lyapunov 8.17%, oracle 10.39%; carbon change lyapunov -5.98% (negative = more carbon).
-- lyapunov penalty is 1.198% above the offline oracle at equal per-basin queue peaks; greedy has lower penalty only by breaking the queue bound (peak 2,540,229 vs 1,630,823 m3).
-- 5/8 basins are overdrawn by NON-shiftable load alone at budget_scale=1 (see routing_budget_sweep.csv). *Synthetic demand; conditional on R-hat.*
+- Budget = alpha x AWARE AMD x basin area: the water left after human consumption and environmental water requirements (AWARE 2.0). Headline alpha = 1, the parameter-free bound. 34 of 96 occupied basin-months have NO water left (AMD <= 0), so any datacenter draw there is an overdraft.
+- vs static, scarcity-water saving: greedy 21.83%, lyapunov 21.68%, oracle 22.25%; carbon change lyapunov -1.44% (negative = more carbon).
+- peak basin overdraft queue: static 778,802 m3, greedy 619,761, lyapunov 545,700; lyapunov penalty is 0.411% above the offline oracle at equal queue peaks.
+- **Finding: routing alone cannot clear the overdraft.** The non-shiftable load by itself overdraws every basin-month with AMD <= 0, a floor of 545,700 m3 peak overdraft that no router can remove; lyapunov reaches 545,700 m3. Over the full year the budget covers the load in 8/8 basins at alpha=1 (the overdraft is seasonal), falling to 4/8 at alpha=0.0001. Siting and capacity limits are needed, not only load shifting (routing_budget_sweep.csv). *Synthetic demand; conditional on R-hat.*
 
 ## L7 Levers — which lever pays
 - zero_liquid_discharge: 312,727,550 m3-eq/yr (37.0% of scarcity), 0 tCO2/yr (0.0%)
@@ -35,16 +36,23 @@
 - 71 facilities scored; **16** harm-flagged; recommended levers: {'efficiency_standard': 12, 'zero_liquid_discharge': 4}.
 
 ## L7 Q1 Siting
-- 125 candidate state x basin cells (10 already hold a DC), minimax regret over 4 criteria.
-- rank 1 overall: Mizoram basin 6953 (small grid: own-generation CI not representative); best on a >=10 TWh grid: Karnataka basin 7423 (rank 19, CF 4.5, CI 396).
+- **Headline: 102 candidate state x basin cells on grids >= 10 TWh/yr** (9 already hold a DC), minimax regret over 4 criteria (new facility's scarcity water, carbon, marginal basin overdraft, grid fossil share). Top 5:
+  1. Karnataka basin 47731: CF 4.5, CI 396 g/kWh, 0 overdraft months, rank band 7-22
+  2. Karnataka basin 48334: CF 18.4, CI 396 g/kWh, 1 overdraft months, rank band 8-24
+  3. Karnataka basin 48527: CF 19.2, CI 396 g/kWh, 2 overdraft months, rank band 13-27
+  4. Karnataka basin 48907: CF 33.8, CI 396 g/kWh, 4 overdraft months, rank band 15-38
+  5. Karnataka basin 49090: CF 35.7, CI 396 g/kWh, 4 overdraft months, rank band 16-40
+- Excluded small grids (23 cells, q1_siting_small_grids.csv): own-generation CI (e.g. Mizoram 25 g/kWh) is not what a new load would draw; reported, not recommended.
 
 ## L8 Uncertainty
-- scarcity-weighted water 90% interval: 616,003,293 - 2,415,142,753 m3-eq/yr; first-order Sobol: {'wue': 0.656, 'util_colocation': 0.279, 'hydro': 0.02, 'pue_colocation': 0.019, 'inference': 0.014, 'ewif': 0.012}.
-- with hydro evaporation attributed at 0: 719,580,813 m3-eq/yr.
+- scarcity-weighted water 90% interval (triangular draws, mode = point estimate): 684,021,102 - 1,943,380,525 m3-eq/yr; MC mean = 1.431x the point estimate (right tail from the sourced WUE upper bound 9 L/kWh).
+- first-order Sobol: {'wue': 0.737, 'util_colocation': 0.213, 'hydro': 0.023, 'pue_colocation': 0.019, 'inference': 0.014, 'ewif': 0.012}.
+- **Sensitivity variant, no hydro reservoir evaporation:** 719,580,813 m3-eq/yr. The primary figure keeps Macknick 2012's hydro evaporation; attributing multi-purpose reservoir evaporation wholly to power is contested in the literature.
 
 
 ### Caveats
 - absolutes are calibrated ranges (util/PUE/WUE assumed); lead with relative/spatial results.
 - state CI is Ember generation-based (R2): small grids that import power show unrepresentative CI.
-- Q3 routing is a stylised controller (synthetic demand, budgets from AWARE area/CF + G3P) — conditional on R-hat.
+- Q3 routing is a stylised controller (synthetic demand, budgets from AWARE AMD) — conditional on R-hat.
+- All 71 costed facilities are colocation: the 11 hyperscaler cloud regions have no disclosed MW and are not in the account.
 - Coordinates are city-centroids; GEM state tags are used without GADM verification.

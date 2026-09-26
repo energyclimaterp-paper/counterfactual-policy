@@ -107,7 +107,9 @@ def run() -> dict:
         lyapunov.v_sweep(account).to_csv(RES / "routing_v_sweep.csv", index=False)
         bs = lyapunov.budget_sweep(account); bs.to_csv(RES / "routing_budget_sweep.csv", index=False)
         return {"table": r, "unstabilisable": with_l.attrs["n_unstabilisable_basins"],
-                "n_basins": with_l.attrs["n_basins"], "budget_sweep": bs}
+                "n_basins": with_l.attrs["n_basins"], "overdraft": with_l.attrs["overdraft_basin_months"],
+                "alpha": with_l.attrs["budget_alpha"], "fixed_floor": with_l.attrs["fixed_only_peak_queue_m3"],
+                "budget_sweep": bs}
     routing = stage("L6 routing (Q3)", _routing)
 
     # --- L7 decisions: levers, scorecard (Q2), siting (Q1) ---
@@ -123,7 +125,10 @@ def run() -> dict:
 
     def _siting():
         from dcfootprint.decisions import siting
-        s = siting.rank_sites(account); s.to_csv(RES / "q1_siting.csv", index=False); return s
+        both = siting.rank_sites(account)
+        both["headline"].to_csv(RES / "q1_siting.csv", index=False)
+        both["small_grids"].to_csv(RES / "q1_siting_small_grids.csv", index=False)
+        return both
     sites = stage("L7 Q1 siting", _siting)
 
     # --- L8 uncertainty ---
@@ -176,15 +181,26 @@ def _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard
                  f"regulatory blind spot; axes mandated anywhere: {gap_overlay['axes_mandated_anywhere']}/4.{rc_line}")
     if routing is not None:
         t = routing["table"]; tl = t[t["legal"]].set_index("policy")
+        bs = routing["budget_sweep"]
         L.append("## L6 Q3 Routing (stylised)\n"
+                 f"- Budget = alpha x AWARE AMD x basin area: the water left after human consumption and environmental "
+                 f"water requirements (AWARE 2.0). Headline alpha = {routing['alpha']:g}, the parameter-free bound. "
+                 f"{routing['overdraft']} of {routing['n_basins'] * 12} occupied basin-months have NO water left (AMD <= 0), "
+                 f"so any datacenter draw there is an overdraft.\n"
                  f"- vs static, scarcity-water saving: greedy {tl.loc['greedy','scarcity_saving_pct_vs_static']}%, "
                  f"lyapunov {tl.loc['lyapunov','scarcity_saving_pct_vs_static']}%, oracle {tl.loc['oracle','scarcity_saving_pct_vs_static']}%; "
                  f"carbon change lyapunov {tl.loc['lyapunov','carbon_saving_pct_vs_static']}% (negative = more carbon).\n"
-                 f"- lyapunov penalty is {tl.loc['lyapunov','penalty_gap_pct_vs_oracle']}% above the offline oracle at equal per-basin queue peaks; "
-                 f"greedy has lower penalty only by breaking the queue bound (peak {tl.loc['greedy','peak_basin_queue_m3']:,.0f} vs "
-                 f"{tl.loc['lyapunov','peak_basin_queue_m3']:,.0f} m3).\n"
-                 f"- {routing['unstabilisable']}/{routing['n_basins']} basins are overdrawn by NON-shiftable load alone at budget_scale=1 "
-                 f"(see routing_budget_sweep.csv). *Synthetic demand; conditional on R-hat.*")
+                 f"- peak basin overdraft queue: static {tl.loc['static','peak_basin_queue_m3']:,.0f} m3, greedy "
+                 f"{tl.loc['greedy','peak_basin_queue_m3']:,.0f}, lyapunov {tl.loc['lyapunov','peak_basin_queue_m3']:,.0f}; "
+                 f"lyapunov penalty is {tl.loc['lyapunov','penalty_gap_pct_vs_oracle']}% above the offline oracle at equal queue peaks.\n"
+                 f"- **Finding: routing alone cannot clear the overdraft.** The non-shiftable load by itself overdraws "
+                 f"every basin-month with AMD <= 0, a floor of {routing['fixed_floor']:,.0f} m3 peak overdraft that no "
+                 f"router can remove; lyapunov reaches {tl.loc['lyapunov','peak_basin_queue_m3']:,.0f} m3. Over the full year "
+                 f"the budget covers the load in {routing['n_basins'] - routing['unstabilisable']}/{routing['n_basins']} basins at "
+                 f"alpha={routing['alpha']:g} (the overdraft is seasonal), falling to "
+                 f"{routing['n_basins'] - int(bs['unstabilisable_basins'].max())}/{routing['n_basins']} at alpha={bs['budget_alpha'].min():g}. "
+                 f"Siting and capacity limits are needed, not only load shifting (routing_budget_sweep.csv). "
+                 f"*Synthetic demand; conditional on R-hat.*")
     if levers_df is not None:
         top = levers_df.iloc[0]
         L.append("## L7 Levers — which lever pays\n" + "\n".join(
@@ -194,19 +210,29 @@ def _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard
         L.append(f"## L7 Q2 Scorecard\n- {len(scard)} facilities scored; **{int(scard['harm_flag'].sum())}** harm-flagged; "
                  f"recommended levers: {scard.loc[scard['harm_flag'], 'recommended_lever'].value_counts().to_dict()}.")
     if sites is not None:
-        big = sites[~sites["small_grid"]]
-        b = big.iloc[0] if len(big) else sites.iloc[0]
-        L.append(f"## L7 Q1 Siting\n- {len(sites)} candidate state x basin cells ({int((sites['n_existing_dc'] > 0).sum())} already hold a DC), minimax regret over 4 criteria.\n"
-                 f"- rank 1 overall: {sites.iloc[0]['state']} basin {sites.iloc[0]['basin_id']}"
-                 f"{' (small grid: own-generation CI not representative)' if sites.iloc[0]['small_grid'] else ''}; "
-                 f"best on a >=10 TWh grid: {b['state']} basin {b['basin_id']} (rank {b['rank']}, CF {b['cf_mean']:.1f}, CI {b['ci_mean']:.0f}).")
+        h, sg = sites["headline"], sites["small_grids"]
+        lines = [f"  {int(r['rank'])}. {r['state']} basin {int(r['basin_id'])}: CF {r['cf_mean']:.1f}, CI {r['ci_mean']:.0f} g/kWh, "
+                 f"{int(r['overdraft_months'])} overdraft months, rank band {r['rank_p10']:.0f}-{r['rank_p90']:.0f}"
+                 for _, r in h.head(5).iterrows()]
+        L.append(f"## L7 Q1 Siting\n- **Headline: {len(h)} candidate state x basin cells on grids >= 10 TWh/yr** "
+                 f"({int((h['n_existing_dc'] > 0).sum())} already hold a DC), minimax regret over 4 criteria "
+                 f"(new facility's scarcity water, carbon, marginal basin overdraft, grid fossil share). Top 5:\n"
+                 + "\n".join(lines)
+                 + (f"\n- Excluded small grids ({len(sg)} cells, q1_siting_small_grids.csv): own-generation CI "
+                    f"(e.g. {sg.iloc[0]['state']} {sg.iloc[0]['ci_mean']:.0f} g/kWh) is not what a new load would draw; "
+                    f"reported, not recommended." if len(sg) else ""))
     if unc:
-        L.append(f"## L8 Uncertainty\n- scarcity-weighted water 90% interval: {unc['scarcity_m3eq_yr']['p05']:,.0f} - {unc['scarcity_m3eq_yr']['p95']:,.0f} m3-eq/yr; "
-                 f"first-order Sobol: {unc['scarcity_sobol_first_order']}.\n"
-                 f"- with hydro evaporation attributed at 0: {unc['scarcity_at_hydro_0_m3eq_yr']:,.0f} m3-eq/yr.")
+        L.append(f"## L8 Uncertainty\n- scarcity-weighted water 90% interval ({unc['distribution']} draws, mode = point estimate): "
+                 f"{unc['scarcity_m3eq_yr']['p05']:,.0f} - {unc['scarcity_m3eq_yr']['p95']:,.0f} m3-eq/yr; MC mean = "
+                 f"{unc['scarcity_mean_over_point']}x the point estimate (right tail from the sourced WUE upper bound 9 L/kWh).\n"
+                 f"- first-order Sobol: {unc['scarcity_sobol_first_order']}.\n"
+                 f"- **Sensitivity variant, no hydro reservoir evaporation:** {unc['scarcity_at_hydro_0_m3eq_yr']:,.0f} m3-eq/yr. "
+                 f"The primary figure keeps Macknick 2012's hydro evaporation; attributing multi-purpose reservoir "
+                 f"evaporation wholly to power is contested in the literature.")
     L.append("\n### Caveats\n- absolutes are calibrated ranges (util/PUE/WUE assumed); lead with relative/spatial results.\n"
              "- state CI is Ember generation-based (R2): small grids that import power show unrepresentative CI.\n"
-             "- Q3 routing is a stylised controller (synthetic demand, budgets from AWARE area/CF + G3P) — conditional on R-hat.\n"
+             "- Q3 routing is a stylised controller (synthetic demand, budgets from AWARE AMD) — conditional on R-hat.\n"
+             "- All 71 costed facilities are colocation: the 11 hyperscaler cloud regions have no disclosed MW and are not in the account.\n"
              "- Coordinates are city-centroids; GEM state tags are used without GADM verification.")
     (RES / "RESULTS_FULL.md").write_text("\n\n".join(L), encoding="utf-8")
     return RES / "RESULTS_FULL.md"

@@ -4,7 +4,9 @@ G3P ends 2023-09, so R-hat is a monthly recharge *climatology*: the mean of
 positive month-over-month TWS change across the major Indian river basins, made
 into a normalised seasonal multiplier (mean 1.0) with a bootstrap band. Labelled
 an estimate, not an observation (v2 L3). It gives the queues a physically sensible
-seasonal shape (monsoon high, dry-season low); routing results are conditional on it.
+seasonal shape (monsoon high, dry-season low). It is now a CONTEXT series: the routing and
+siting budgets come from AWARE's monthly water-remaining (basin_budgets below), which is
+basin-specific and already nets out environmental flow requirements.
 """
 from __future__ import annotations
 
@@ -51,28 +53,18 @@ def recharge_climatology(n_boot: int = 500, seed: int = 0) -> pd.DataFrame:
     })
 
 
-def basin_budgets(basin_ids, total_annual_l: float, rmult: dict | None = None) -> pd.DataFrame:
-    """[basin_id, month, budget_l] — stylised monthly water budget per basin, DECOUPLED
-    from datacenter use:
-        budget_b(m) = kappa * g3p_seasonal(m) * area_b / mean_m CF_b
-    AWARE CF = world-average / basin availability-minus-demand PER AREA, so area/CF is
-    proportional to the water remaining in the basin. kappa is one global scalar chosen so
-    the budgets sum to `total_annual_l` (routing.budget_scale x baseline scope-1 water)."""
-    from dcfootprint.geo import join as gj
-    if rmult is None:
-        rmult = recharge_climatology().set_index("month")["recharge_mult"].to_dict()
-    b = gj.load_aware_basins()
-    b = b[b["basin_id"].isin([int(x) for x in basin_ids])].copy()
-    cf_cols = [c for c in b.columns if c.startswith("CF_")]
-    b["cf_mean"] = b[cf_cols].mean(axis=1)
-    b["area_km2"] = b.to_crs("EPSG:6933").area / 1e6            # equal-area projection
-    b["weight"] = b["area_km2"] / b["cf_mean"]
-    rows = [{"basin_id": int(r.basin_id), "month": m, "raw": r.weight * rmult.get(m, 1.0),
-             "area_km2": r.area_km2, "cf_mean": r.cf_mean}
-            for r in b.itertuples() for m in range(1, 13)]
-    out = pd.DataFrame(rows)
-    out["budget_l"] = out["raw"] * total_annual_l / out["raw"].sum()
-    return out.drop(columns="raw")
+def basin_budgets(basin_ids, alpha: float = 1.0) -> pd.DataFrame:
+    """[basin_id, month, budget_l, remaining_m3] — monthly water budget per basin for the Q3
+    queues and the Q1 pressure term, DECOUPLED from datacenter use:
+        budget_b(m) = alpha * max(AMD_b(m), 0) * area_b        (AWARE 2.0, io/aware.py)
+    AMD already nets out human consumption AND environmental water requirements, so alpha = 1
+    means "no more than the water left after people and environmental flows"; a month with
+    AMD <= 0 has a zero budget (any draw is an overdraft)."""
+    from dcfootprint.io.aware import load_remaining
+    r = load_remaining()
+    r = r[r["basin_id"].isin([int(x) for x in basin_ids])].copy()
+    r["budget_l"] = alpha * r["remaining_m3"].clip(lower=0) * 1000.0
+    return r[["basin_id", "month", "budget_l", "remaining_m3"]].reset_index(drop=True)
 
 
 if __name__ == "__main__":

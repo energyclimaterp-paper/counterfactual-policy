@@ -1,7 +1,7 @@
 """L1 — spatial linkage: facility point -> AWARE basin (point-in-polygon) + the
 basin's 12 monthly scarcity CFs. Also carries zone_id (state) for later state-level
-joins. AWARE has no Basin_ID column (it is the feature FID) -> we use the gpkg row
-index as basin_id, exactly as the gate-3 fix established.
+joins. AWARE's Basin_ID is the GPKG feature id (read with pyogrio fid_as_index), so basin_id
+joins directly to the AWARE intermediate-variable tables (io/aware.py).
 """
 from __future__ import annotations
 
@@ -18,12 +18,14 @@ _CF_MONTHS = ["CF_Jan", "CF_Feb", "CF_Mar", "CF_Apr", "CF_May", "CF_Jun",
 
 
 def load_aware_basins(path: str | Path | None = None) -> gpd.GeoDataFrame:
-    """Read the AWARE native-CF basins. basin_id = the gpkg row index (the FID);
-    keep monthly CFs + geometry."""
+    """Read the AWARE native-CF basins; keep monthly CFs + geometry. basin_id = the GPKG's
+    native feature id, which IS AWARE's Basin_ID (geopandas.read_file drops it; pyogrio with
+    fid_as_index keeps it — verified 9,406/9,406 against the xlsx in AWARE2.0_AUDIT.md)."""
+    import pyogrio
     path = Path(path) if path else _repo_root() / "data" / "aware" / "AWARE20_Native_CFs_geospatial.gpkg"
-    g = gpd.read_file(path, layer=AWARE_LAYER)
+    g = pyogrio.read_dataframe(path, layer=AWARE_LAYER, fid_as_index=True)
+    g["basin_id"] = g.index.to_numpy().astype("int64")
     g = g.reset_index(drop=True)
-    g["basin_id"] = g.index.astype("int64")
     return g[["basin_id", *_CF_MONTHS, "geometry"]]
 
 

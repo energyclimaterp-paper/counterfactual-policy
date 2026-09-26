@@ -9,8 +9,9 @@ criteria, all lower-is-better:
   new_scarcity_m3eq   its scarcity-weighted water: scope-1 x CF(basin, m) +
                       scope-2 x generation-basin CF of the state's grid (sewif)
   new_carbon_tco2     its carbon at the state's 2024 monthly CI
-  basin_pressure      (existing DC scope-1 water in the basin + its own) / basin budget
-                      (budget ~ area/CF, the same decoupled R_hat as Q3 routing)
+  basin_pressure_m3   the rise in the basin's peak water queue that the new facility causes
+                      (Delta D_b), with the Q3 budget: water left after human use and
+                      environmental flows (AWARE AMD x area); months with AMD <= 0 are overdrafts
   grid_fossil_share   operating fossil share of the state's GEM capacity
 Legal screen (policy/gap.region_effects): bans exclude a cell; ZLD / renewable-share /
 PUE mandates change the new facility's footprint. Ranked with AND without legal effects.
@@ -19,6 +20,10 @@ Weights are Dirichlet-sampled; cells are ranked by MINIMAX REGRET (worst-case ga
 best cell across weightings), with mean rank and a p10-p90 rank band as the stability
 check. Output = regions with reasons, not plots (land, fibre and interconnection queues
 are not in the data). 2030/2050 scenarios (Aqueduct future, CI path) are not yet included.
+
+States generating < siting.small_grid_twh a year are ranked in a SEPARATE table: their
+Ember CI is their own (often hydro-only) generation, not what a new 50 MW load would draw
+on the grid it imports from (R2), so they are not part of the headline recommendation.
 """
 from __future__ import annotations
 
@@ -29,7 +34,7 @@ import yaml
 from dcfootprint.io.facilities import _repo_root
 from dcfootprint.account.energy import month_hours
 
-CRITERIA = ["new_scarcity_m3eq", "new_carbon_tco2", "basin_pressure", "grid_fossil_share"]
+CRITERIA = ["new_scarcity_m3eq", "new_carbon_tco2", "basin_pressure_m3", "grid_fossil_share"]
 
 
 def _cfg() -> dict:
@@ -104,12 +109,25 @@ def score_cells(account: pd.DataFrame, legal: bool = True) -> pd.DataFrame:
     cells["new_carbon_tco2"] = cells["c_per_pue"] * pue * (1 - re)
     new_onsite_l = float(e_it["e_it_mwh"].sum() * 1000 * wue) * (1 - zld)
 
-    # marginal basin pressure against the decoupled budget (kappa cancels under min-max)
-    bud = basin_budgets(cells["basin_id"].unique(), 1.0).groupby("basin_id")["budget_l"].sum()
-    exist = account.groupby(account["basin_id"].astype("int64"))["water_onsite_l"].sum()
-    cells["basin_pressure"] = ((cells["basin_id"].map(exist).fillna(0).values + new_onsite_l)
-                               / cells["basin_id"].map(bud).values)
-    cells["basin_pressure"] = cells["basin_pressure"] / cells["basin_pressure"].median()   # index, median = 1
+    # marginal basin pressure: Delta D_b = rise in the peak queue D(t+1) = (D + W - R)^+ over a
+    # steady year (one spin-up year), with vs without the new facility's scope-1 draw
+    cyc = []
+    exist_m = (account.assign(basin_id=account["basin_id"].astype("int64"))
+               .groupby(["basin_id", "month"])["water_onsite_l"].sum())
+    bud = basin_budgets(cells["basin_id"].unique(), 1.0).set_index(["basin_id", "month"])["budget_l"]
+    new_m = (e_it.set_index("month")["e_it_mwh"] * 1000 * wue)                        # L per month
+    def peak(bid, extra):
+        D, pk = 0.0, 0.0
+        for yr in range(2):
+            for m in range(1, 13):
+                D = max(D + exist_m.get((bid, m), 0.0) + extra * new_m[m] - bud.get((bid, m), 0.0), 0.0)
+                if yr == 1:
+                    pk = max(pk, D)
+        return pk
+    for bid, z in zip(cells["basin_id"], zld):
+        cyc.append((peak(bid, 1 - z) - peak(bid, 0.0)) / 1000.0)
+    cells["basin_pressure_m3"] = cyc
+    cells["overdraft_months"] = [int(sum(bud.get((b, m), 0.0) <= 0 for m in range(1, 13))) for b in cells["basin_id"]]
 
     # R2 guard: a state's Ember CI is its OWN generation; a small grid that imports most of its
     # power (e.g. hydro-only NE states) shows a CI the datacenter would not actually see.
@@ -139,10 +157,9 @@ def _minimax(cells: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
     return c.sort_values(["max_regret", "mean_rank"])
 
 
-def rank_sites(account: pd.DataFrame, n_weight_samples: int | None = None, seed: int = 0) -> pd.DataFrame:
-    n = int(_cfg()["siting"]["weight_samples"]) if n_weight_samples is None else n_weight_samples
-    with_legal = _minimax(score_cells(account, legal=True), n, seed).reset_index(drop=True)
-    no_legal = _minimax(score_cells(account, legal=False), n, seed)
+def _rank(legal_cells: pd.DataFrame, nolegal_cells: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
+    with_legal = _minimax(legal_cells, n, seed).reset_index(drop=True)
+    no_legal = _minimax(nolegal_cells, n, seed)
     no_legal["rank_nolegal"] = np.arange(1, len(no_legal) + 1)
     out = with_legal.merge(no_legal[["state", "basin_id", "rank_nolegal"]], on=["state", "basin_id"], how="left")
     out.insert(0, "rank", np.arange(1, len(out) + 1))
@@ -152,11 +169,25 @@ def rank_sites(account: pd.DataFrame, n_weight_samples: int | None = None, seed:
     return out
 
 
+def rank_sites(account: pd.DataFrame, n_weight_samples: int | None = None, seed: int = 0) -> dict:
+    """{'headline': cells on grids >= small_grid_twh, ranked among themselves,
+        'small_grids': the excluded small-grid cells, ranked among themselves (caveat: own-
+        generation CI is not what a new datacenter would draw)}."""
+    n = int(_cfg()["siting"]["weight_samples"]) if n_weight_samples is None else n_weight_samples
+    lc, nc = score_cells(account, legal=True), score_cells(account, legal=False)
+    big = lambda d: d[~d["small_grid"]]
+    small = lambda d: d[d["small_grid"]]
+    return {"headline": _rank(big(lc), big(nc), n, seed),
+            "small_grids": _rank(small(lc), small(nc), n, seed)}
+
+
 if __name__ == "__main__":
     acct = pd.read_parquet(_repo_root() / "dcfootprint" / "outputs" / "account_facility_month.parquet")
-    r = rank_sites(acct)
+    both = rank_sites(acct)
+    r = both["headline"]
+    print(f"small-grid cells ranked separately: {len(both['small_grids'])}")
     print(f"Q1 SITING — {len(r)} candidate cells ({int((r['n_existing_dc'] > 0).sum())} already hold a DC); minimax regret:\n")
     cols = ["rank", "state", "basin_id", "n_existing_dc", "cf_mean", "ci_mean", "grid_fossil_share",
-            "new_scarcity_m3eq", "basin_pressure", "max_regret", "rank_p10", "rank_p90", "rank_nolegal", "legal_flags"]
+            "new_scarcity_m3eq", "basin_pressure_m3", "overdraft_months", "max_regret", "rank_p10", "rank_p90", "rank_nolegal", "legal_flags"]
     print(r.head(12)[cols].round(3).to_string(index=False))
     print("\nexisting-DC cells:\n", r[r["n_existing_dc"] > 0][cols].round(3).to_string(index=False))
