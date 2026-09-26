@@ -149,6 +149,7 @@ def run() -> dict:
 
     # --- L9 combined report ---
     stage("L9 report", lambda: _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard, sites, unc))
+    stage("L9 figures", lambda: __import__("dcfootprint.viz.figures", fromlist=["make_all"]).make_all(RES))
 
     print("\n===== PIPELINE STATUS =====")
     for n, s in status:

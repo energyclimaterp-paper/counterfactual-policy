@@ -37,6 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 forecast-tsfm = ["chronos-forecasting"]   # Chronos-2 TSFM (heavy; Ceiling only)
+dev = ["pytest>=8"]
 dev = ["pytest>=8", "ruff>=0.5", "snakemake>=8"]
 
 [build-system]
