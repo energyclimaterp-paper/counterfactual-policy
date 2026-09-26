@@ -21,16 +21,27 @@ _CLOSEST = {
     "inference_attribution": "EU AI Act Annex XI model energy doc (training, no water/carbon)",
 }
 
-# hard/soft constraints that DO bite (used by routing legal screen + siting)
-HARD_CONSTRAINTS = pd.DataFrame([
-    {"jurisdiction": "India", "region": "Rajasthan", "rule": "ZLD + recharge mandatory", "type": "hard"},
-    {"jurisdiction": "India", "region": "Gujarat", "rule": ">=51% renewable energy", "type": "hard"},
-    {"jurisdiction": "EU", "region": "Germany", "rule": "PUE<=1.2 new (2026)", "type": "hard"},
-    {"jurisdiction": "EU", "region": "Ireland", "rule": ">=80% additional RE; locational test", "type": "hard"},
-    {"jurisdiction": "EU", "region": "Netherlands", "rule": "hyperscale ban (>10ha & >=70MW)", "type": "hard"},
-    {"jurisdiction": "EU", "region": "EU-wide", "rule": "EED/2024-1364 PUE+WUE reporting >=500kW", "type": "soft"},
-    {"jurisdiction": "US", "region": "Minnesota", "rule": "RE/carbon-free supply; >100Mgal water permit", "type": "hard"},
-])
+# hard/soft constraints that DO bite, with a machine-readable `effect` + `param` so the
+# routing (Q3) and siting (Q1) layers can apply them (config/legal_constraints.csv).
+def load_constraints() -> pd.DataFrame:
+    from dcfootprint.io.facilities import _repo_root
+    return pd.read_csv(_repo_root() / "dcfootprint" / "config" / "legal_constraints.csv")
+
+
+HARD_CONSTRAINTS = load_constraints()
+
+
+def region_effects(region: str, constraints: pd.DataFrame | None = None) -> dict:
+    """{effect: param} for the hard rules that apply in `region` (a state / country name).
+    Effects understood downstream:
+      zld_mandate       -> scope-1 water x (1 - param)
+      re_share_min      -> grid carbon x (1 - param)   (the mandated renewable share is carbon-free)
+      ban_new_above_mw  -> no new facility / no added load at or above `param` MW
+      pue_cap_new       -> PUE <= param for new facilities
+      water_permit_mgal -> annual scope-1 water above `param` million US gal needs a permit (flag)"""
+    c = HARD_CONSTRAINTS if constraints is None else constraints
+    rows = c[(c["type"] == "hard") & (c["region"] == region)]
+    return {r["effect"]: float(r["param"]) for _, r in rows.iterrows() if pd.notna(r["param"])}
 
 
 def four_axis_matrix() -> pd.DataFrame:

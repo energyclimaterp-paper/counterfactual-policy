@@ -30,27 +30,29 @@ W_grid  = EWIF(z,m) · E_grid                       # scope-2
 W_phys  = W_onsite + W_grid                        # PHYSICAL litres — reported first
 W_scarce= W_phys · AWARE_CF(b, month)             # scarcity-weighted — SEPARATE column, never blended
 ```
-Counterfactual (L3): a **lever = a parameter transform** (coastal→WUE↓; ZLD→W_phys·(1−recycle);
+Levers (L7): a **lever = a parameter transform** (coastal→WUE↓; ZLD→W_onsite·(1−recycle), scope-1 only;
 efficiency→PUE/WUE cap, with the energy↑/water↓ trade-off), re-run the account, report Δ vs baseline → rank.
 
 ## Layers → modules → libraries
-| Layer | Module | Libraries |
+| Layer (ARCHITECTURE v2) | Module | Libraries |
 |---|---|---|
-| config | `config/*.yaml` | pydantic, PyYAML |
-| L0 load | `io/` (ember, cea, egrid, aware, macknick, facilities, cgwb, gem) | pandas, pyarrow, openpyxl |
-| L1 geo-join | `geo/` (facility→state via GADM; facility→basin via AWARE point-in-polygon) | geopandas, shapely, pyogrio |
-| **contracts** | `validation/schemas.py` | **pandera** (+ pint for units) |
-| L2 account | `account/` (energy, carbon, water) | pandas, numpy |
-| L3 counterfactual | `counterfactual/levers.py` | pandas |
-| L4 forecast (Ceiling) | `forecast/` | statsmodels, sktime, [chronos-forecasting] |
-| L5 policy | `policy/gap.py` | pandas |
-| L6 uncertainty | `uncertainty/mc.py` | numpy, scipy, SALib |
-| L7 orchestration | `workflow/Snakefile` | **snakemake** |
+| config | `config/parameters.yaml`, `datasets.yaml`, `legal_constraints.csv` | PyYAML |
+| L0 ingest | `io/` (facilities, ember, gem, cea [optional cross-check]) | pandas, pyarrow, openpyxl |
+| L1 geo linkage | `geo/join.py` (facility→AWARE basin), `geo/generation_basins.py` (GEM plant→basin, scope-2 CF) | geopandas, shapely, pyogrio |
+| **contracts** | `validation/schemas.py` | **pandera** |
+| L2 account | `account/` (energy, carbon = E_grid·CI(state,m), water, build, calibrate) | pandas, numpy |
+| L3 forecast + R̂ | `project/forecast.py` (rolling backtest), `project/recharge.py` (G3P season, basin budgets) | statsmodels |
+| L4 spatial coupling | `geo/incidence.py` (A_zone, A_basin — used by routing) | pandas |
+| L5 policy | `policy/gap.py` (matrix + constraint effects), `policy/rag_bridge.py` | pandas |
+| L6 routing (Q3) | `routing/lyapunov.py` (static · greedy · lyapunov · perfect-foresight · offline LP oracle) | scipy (HiGHS) |
+| L7 decisions | `counterfactual/levers.py` (ranked levers), `decisions/scorecard.py` (Q2), `decisions/siting.py` (Q1) | numpy |
+| L8 uncertainty | `uncertainty/monte_carlo.py` (per-type bands, first-order Sobol) | numpy |
+| L9 orchestration | `pipeline.py` (tested entrypoint), `workflow/Snakefile` (wrapper) | snakemake |
 | viz/maps | `viz/` | matplotlib, geopandas, folium |
 
 ## Execution — one spine + parallel tracks (see `workflow/Snakefile`)
 ```
-SPINE:   facilities → geo_join → account (L2) → counterfactual (L3)  → finding
+SPINE:   facilities → geo_join → account (L2) → levers (L7)  → finding
 TRACK A: load_ember + load_aware + macknick        (data; land before account)
 TRACK B: regulatory_gap (L5)                        (policy; land before counterfactual)
 TRACK C: forecast (L4, Ceiling)                     (independent; integrate after account)
@@ -83,3 +85,15 @@ dcfootprint/
 ## The four granularity decisions locked into config (DATA.md §E3/F)
 US carbon = Ember-state (eGRID = cross-check) · EU = country-only (light) · India carbon = Ember-state
 generation-proxy (water carries India novelty) · scarcity = AWARE gpkg only (Aqueduct ≠ joinable key).
+
+## Data layout expected at the repo root (`data/`, gitignored)
+```
+data/ember/india_monthly_full_release_long_format.csv
+data/atlas/datacenters.parquet
+data/aware/AWARE20_Native_CFs_geospatial.gpkg
+data/g3p/G3P_v1.12_tws_rivbas.csv
+data/gem/Global-Integrated-Power-March-2026-II.xlsx      (India subset cached as parquet on first run)
+data/cea/CEA_Database_V22.xlsx                           (optional: cross-check only)
+```
+The Co-RE forecast benchmark is read from `$DCF_GAT_DIR`, else `gat-based-forecasting/diff/gat-sarima-nexus`,
+else `../diff/gat-sarima-nexus`. Its "Nexus" rows are **Chronos-2 in the Nexus slot** and are reported under that label.

@@ -52,6 +52,29 @@ water_grid:               # scope-2 EWIF = sum(fuel_share * macknick_coeff)
     Other Fossil: 1800   # default
     Other Renewables: 500
   note: "US coefficients applied to IN/EU -> representativeness caveat + sensitivity"
+  # Hydro's 17,000 L/MWh is reservoir evaporation attributed wholly to power; run-of-river
+  # and multi-purpose reservoirs argue for far less. The MC samples a multiplier on the hydro
+  # coefficient over this band (0 = no evaporation attributed to power, 1 = full Macknick).
+  hydro_multiplier_band: [0.0, 1.0]
+
+# Grid zone used for carbon CI, scope-2 EWIF and scope-2 scarcity (generation basins).
+# state    = Ember state-month generation mix (generation-based, NOT consumption; R2 caveat)
+# national = Ember India-total month (the pooled synchronous-grid reading)
+# CEA national-annual EF is kept only as a cross-check when data/cea/ is present.
+grid:
+  zone: state
+  account_year: 2024
+  gem_path: "data/gem/Global-Integrated-Power-March-2026-II.xlsx"
+  # GEM 'Type' -> Ember fuel (the Macknick coefficient key)
+  gem_type_to_fuel:
+    coal: Coal
+    oil/gas: Gas
+    nuclear: Nuclear
+    hydropower: Hydro
+    bioenergy: Bioenergy
+    utility-scale solar: Solar
+    wind: Wind
+    geothermal: Other Renewables
 
 inference:
   # ⚠️ R13: this is a SCOPING sensitivity range, NOT per-facility attribution (no dataset
@@ -96,6 +119,7 @@ levers:
     type: recycle
     recycle_fraction: 0.92    # closed-loop returns ~90-95% (DATA.md E5)
     band: [0.90, 0.95]
+    applies_to: scope1        # on-site cooling water only; power-plant (scope-2) water is untouched
   efficiency_standard:
     type: pue_wue_cap
     pue_cap: 1.3
@@ -107,9 +131,39 @@ regions:
   # ⚠️ R2: a DC consumes the POOLED regional/national grid, not its state's generation mix.
   # -> carbon must be CONSUMPTION-based at the grid region, NOT state generation-CI.
   carbon_working_source:
-    India: cea_regional_annual        # 5 regional grids, consumption-based (correct grain)
-    India_generation_proxy: ember_state_monthly  # sensitivity only; flagged generation-vs-consumption
+    India: ember_state_monthly        # set by grid.zone; generation-based -> R2 caveat stated in results
+    India_pooled_alternative: ember_national_monthly   # grid.zone: national
+    India_crosscheck: cea_national_annual              # only if data/cea/ is present
     US: egrid_subregion_annual        # eGRID subregion = the consumption grid; Ember-state = x-check
     EU: ember_country_monthly         # no sub-national -> light tier
   # => India sub-national NOVELTY rides on WATER (local), not carbon (regional). Stated.
   comparison_unit: per_MW_and_basin_level   # ⚠️ R11: common normalised unit for the cross-region gradient
+
+# ---------------------------------------------------------------------------
+# Q3 ROUTING (L6) — stylised monthly environment.
+routing:
+  flexible_share: 0.3       # fraction of load that can move between facilities
+  max_util: 0.90            # a facility can run up to this utilisation
+  V: 1.0                    # drift-plus-penalty weight (swept in v_sweep)
+  v_sweep: [0.1, 1.0, 10.0]
+  lambda: 1.0               # scarcity water vs carbon weight (both normalised to mean 1)
+  demand_noise: 0.05
+  seeds: 10
+  # Basin water budget R_hat_b(m), DECOUPLED from datacenter use:
+  #   R_hat_b(m) = kappa * g3p_seasonal(m) / mean_month CF_b
+  # AWARE CF = world-average / basin availability-minus-demand, so 1/CF is proportional to the
+  # water remaining per area in that basin. kappa is ONE global scalar, set so the sum of
+  # budgets = budget_scale x total baseline scope-1 water. Basin queues track SCOPE-1 water
+  # only (scope-2 is drawn at power-plant basins, not the facility's basin).
+  budget_scale: 1.0
+
+# ---------------------------------------------------------------------------
+# Q1 SITING (L7).
+siting:
+  new_facility_mw: 50       # size S of the hypothetical new facility
+  new_facility_type: colocation
+  weight_samples: 500
+  min_plants_per_cell: 2    # GEM state tags are occasionally wrong; single-plant cells are dropped (existing-DC cells kept)
+  small_grid_twh: 10        # states generating < this (TWh/yr) are flagged: their own-generation CI is not what a DC would draw
+  # candidate cells = (state x AWARE basin) cells holding >=1 operating GEM plant,
+  # plus every cell that already holds a datacenter

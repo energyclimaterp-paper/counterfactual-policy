@@ -84,8 +84,16 @@ class FacilityMonthAccount(pa.DataFrameModel):
     water_onsite_l: Series[float] = pa.Field(ge=0)       # scope-1
     water_grid_l: Series[float] = pa.Field(ge=0)         # scope-2
     water_phys_l: Series[float] = pa.Field(ge=0)         # physical total (reported FIRST)
+    water_scarcity_onsite_l_eq: Series[float] = pa.Field(ge=0)  # scope-1 x CF(facility basin)
+    water_scarcity_grid_l_eq: Series[float] = pa.Field(ge=0)    # scope-2 x CF(generation basins)
     water_scarcity_l_eq: Series[float] = pa.Field(ge=0)  # AWARE-weighted (SEPARATE)
     inference_share: Series[float] = pa.Field(ge=0, le=1)
+
+    @pa.dataframe_check
+    def scarcity_is_sum_of_scopes(cls, df: pd.DataFrame) -> bool:
+        import numpy as np
+        return np.allclose(df["water_scarcity_l_eq"],
+                           df["water_scarcity_onsite_l_eq"] + df["water_scarcity_grid_l_eq"], rtol=1e-6)
 
     @pa.dataframe_check
     def atomic_unit_is_facility_month(cls, df: pd.DataFrame) -> bool:

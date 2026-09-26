@@ -1,0 +1,48 @@
+{
+  "n_samples": 4000,
+  "facility_types": {
+    "colocation": 71
+  },
+  "carbon_tco2_yr": {
+    "mean": 3939957.0,
+    "p05": 2540988.0,
+    "p95": 5504529.0
+  },
+  "carbon_inference_tco2_yr": {
+    "mean": 3347237.0,
+    "p05": 2157578.0,
+    "p95": 4695626.0
+  },
+  "water_phys_m3_yr": {
+    "mean": 35856167.0,
+    "p05": 17874404.0,
+    "p95": 59275602.0
+  },
+  "scarcity_m3eq_yr": {
+    "mean": 1398043102.0,
+    "p05": 616003293.0,
+    "p95": 2415142753.0
+  },
+  "scarcity_inference_m3eq_yr": {
+    "mean": 1187942995.0,
+    "p05": 521429700.0,
+    "p95": 2054494695.0
+  },
+  "scarcity_at_hydro_0_m3eq_yr": 719580813.0,
+  "scarcity_sobol_first_order": {
+    "wue": 0.656,
+    "util_colocation": 0.279,
+    "hydro": 0.02,
+    "pue_colocation": 0.019,
+    "inference": 0.014,
+    "ewif": 0.012
+  },
+  "scarcity_oat_swing_Mm3eq": {
+    "wue": 1262.2,
+    "util_colocation": 558.1,
+    "pue_colocation": 134.0,
+    "ewif": 129.1,
+    "hydro": 106.0,
+    "inference": 84.4
+  }
+}

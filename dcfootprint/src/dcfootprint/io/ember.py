@@ -69,6 +69,68 @@ def monthly_ewif_l_per_mwh(shares: pd.DataFrame, ewif_coeff: dict[str, float]) -
                     .rename(columns={"ewif": "ewif_l_per_mwh"}))
 
 
+# --------------------------------------------------------------------------- #
+# Zone-month tables (zone = Ember state, or the India total for every state)
+# --------------------------------------------------------------------------- #
+_NATIONAL = "India Total"
+_NOT_A_STATE = {_NATIONAL, "Others"}
+
+
+def zone_month_ci(raw: pd.DataFrame, year: int, zone: str = "state") -> pd.DataFrame:
+    """[zone_id, month, ci_gco2_per_kwh, ci_source] for `year`.
+    zone='state': Ember state generation CI (generation-based; R2 caveat), with the national
+    value filling any state-month Ember leaves blank. zone='national': India Total for all."""
+    ci = raw[(raw["Variable"] == "CO2 intensity") & (raw["Unit"] == "gCO2/kWh")
+             & (raw["date"].dt.year == year)].copy()
+    ci["month"] = ci["date"].dt.month
+    nat = (ci[ci["State"] == _NATIONAL].groupby("month")["Value"].mean()
+           .rename("ci_national"))
+    states = sorted(s for s in raw["State"].dropna().unique() if s not in _NOT_A_STATE)
+    grid = pd.MultiIndex.from_product([states, range(1, 13)], names=["zone_id", "month"]).to_frame(index=False)
+    grid = grid.merge(nat, on="month", how="left")
+    if zone == "state":
+        st = (ci[ci["State"].isin(states)].groupby(["State", "month"])["Value"].mean()
+              .rename("ci_state").reset_index().rename(columns={"State": "zone_id"}))
+        grid = grid.merge(st, on=["zone_id", "month"], how="left")
+        grid["ci_gco2_per_kwh"] = grid["ci_state"].fillna(grid["ci_national"])
+        grid["ci_source"] = grid["ci_state"].notna().map({True: "ember_state", False: "ember_national_fill"})
+    elif zone == "national":
+        grid["ci_gco2_per_kwh"] = grid["ci_national"]
+        grid["ci_source"] = "ember_national"
+    else:
+        raise ValueError(f"unknown grid zone {zone!r} (state | national)")
+    return grid[["zone_id", "month", "ci_gco2_per_kwh", "ci_source"]]
+
+
+def zone_month_fuel_shares(raw: pd.DataFrame, year: int, zone: str = "state") -> pd.DataFrame:
+    """[zone_id, month, fuel, share] generation shares for `year`; a state-month with no
+    generation in Ember takes the national shares (flagged via share_source)."""
+    gen = raw[(raw["Category"] == "Electricity generation") & (raw["Variable"].isin(_FUELS))
+              & (raw["Unit"] == "GWh") & (raw["date"].dt.year == year)].copy()
+    gen["month"] = gen["date"].dt.month
+    gen["Value"] = gen["Value"].clip(lower=0)
+
+    def _shares(df, key):
+        g = df.groupby([key, "month", "Variable"], as_index=False)["Value"].sum()
+        g["share"] = g["Value"] / g.groupby([key, "month"])["Value"].transform("sum")
+        return g.rename(columns={key: "zone_id", "Variable": "fuel"})[["zone_id", "month", "fuel", "share"]]
+
+    nat = _shares(gen[gen["State"] == _NATIONAL], "State").drop(columns="zone_id")
+    states = sorted(s for s in raw["State"].dropna().unique() if s not in _NOT_A_STATE)
+    if zone == "national":
+        out = pd.concat([nat.assign(zone_id=s) for s in states], ignore_index=True)
+        out["share_source"] = "ember_national"
+        return out
+    st = _shares(gen[gen["State"].isin(states)], "State").dropna(subset=["share"])
+    have = set(map(tuple, st[["zone_id", "month"]].drop_duplicates().values))
+    missing = [(s, m) for s in states for m in range(1, 13) if (s, m) not in have]
+    fill = pd.concat([nat[nat["month"] == m].assign(zone_id=s) for s, m in missing]
+                     or [nat.iloc[0:0].assign(zone_id="")], ignore_index=True)
+    st["share_source"] = "ember_state"
+    fill["share_source"] = "ember_national_fill"
+    return pd.concat([st, fill], ignore_index=True)[["zone_id", "month", "fuel", "share", "share_source"]]
+
+
 if __name__ == "__main__":
     import yaml
     raw = load_india_raw()

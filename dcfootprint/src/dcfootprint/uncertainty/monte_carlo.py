@@ -1,82 +1,109 @@
 """L8 — Monte-Carlo uncertainty over the modelled parameter bands.
 
-Absolute footprints rest on util/PUE/WUE/EWIF assumptions (red-team R1), so we
-propagate their bands to confidence intervals on the totals, and report a simple
-one-at-a-time sensitivity (which parameter drives the spread). Analytic scaling of
-the account components (fast, exact) rather than re-running the whole pipeline:
-  carbon    ~ util * pue
-  onsite W  ~ util * wue
-  grid  W   ~ util * pue * ewif
-(SALib/Sobol not installed -> one-at-a-time variance contribution instead.)
+Absolute footprints rest on util/PUE/WUE/EWIF assumptions (red-team R1), so we propagate
+their bands (parameters.yaml) to intervals on the totals. Analytic scaling of the account
+components per facility type (fast, exact) rather than re-running the pipeline:
+  carbon         ~ util_t * pue_t
+  onsite W       ~ util_t * wue
+  grid W (non-hydro) ~ util_t * pue_t * ewif
+  grid W (hydro) ~ util_t * pue_t * hydro     (hydro multiplier on Macknick's 17,000 L/MWh)
+  inference-attributed = total * inference_share
+Util and PUE are drawn per facility type from that type's band (hyperscale / colocation /
+...), independently across types. Sensitivity: first-order Sobol indices estimated from the
+same samples (variance of the binned conditional mean; SALib not required), plus the
+one-at-a-time swing.
 """
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import yaml
 
-# relative multiplier ranges = band / default, from parameters.yaml
-_RANGES = {
-    "util": (0.30 / 0.45, 0.65 / 0.45),
-    "pue": (1.4 / 1.6, 1.9 / 1.6),
-    "wue": (0.7 / 1.9, 9.0 / 1.9),      # very wide -> expected to dominate water spread
-    "ewif": (0.8, 1.2),
-    "inference": (0.80 / 0.85, 0.90 / 0.85),
-}
+from dcfootprint.io.facilities import _repo_root
 
 
-def _components(account: pd.DataFrame) -> dict:
-    a = account
+def _bands() -> dict:
+    p = yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+    rel = lambda d: (d["band"][0] / d["default"], d["band"][1] / d["default"])
     return {
-        "carbon": float(a["carbon_tco2"].sum()),
-        "onsite": float(a["water_onsite_l"].sum() / 1000.0),
-        "grid": float(a["water_grid_l"].sum() / 1000.0),
-        "sc_onsite": float((a["water_onsite_l"] * a["cf"]).sum() / 1000.0),
-        "sc_grid": float((a["water_grid_l"] * a["cf"]).sum() / 1000.0),
+        "util": {t: rel(v) for t, v in p["energy"]["utilisation"]["by_facility_type"].items()},
+        "pue": {t: rel(v) for t, v in p["energy"]["pue"]["by_facility_type"].items()},
+        "wue": rel(p["water_onsite"]["wue_default"]),
+        "ewif": (0.8, 1.2),
+        "hydro": tuple(p["water_grid"]["hydro_multiplier_band"]),
+        "inference": tuple(p["inference"]["sectoral_share"]["band"]),
+        "inference_default": p["inference"]["sectoral_share"]["default"],
     }
 
 
-def _totals(b: dict, u, p, w, e, i):
-    carbon = b["carbon"] * u * p
-    phys = b["onsite"] * u * w + b["grid"] * u * p * e
-    scarcity = b["sc_onsite"] * u * w + b["sc_grid"] * u * p * e
-    return carbon, phys, scarcity
+def _components(account: pd.DataFrame) -> pd.DataFrame:
+    a = account.assign(
+        grid_nh=account["water_grid_l"] - account["water_grid_hydro_l"],
+        sc_grid_nh=account["water_scarcity_grid_l_eq"] - account["water_scarcity_grid_hydro_l_eq"])
+    return a.groupby("facility_type").agg(
+        carbon=("carbon_tco2", "sum"),
+        onsite=("water_onsite_l", lambda s: s.sum() / 1000), sc_onsite=("water_scarcity_onsite_l_eq", lambda s: s.sum() / 1000),
+        grid_nh=("grid_nh", lambda s: s.sum() / 1000), sc_grid_nh=("sc_grid_nh", lambda s: s.sum() / 1000),
+        grid_h=("water_grid_hydro_l", lambda s: s.sum() / 1000),
+        sc_grid_h=("water_scarcity_grid_hydro_l_eq", lambda s: s.sum() / 1000))
 
 
-def monte_carlo(account: pd.DataFrame, n: int = 2000, seed: int = 0) -> dict:
-    b = _components(account)
+def _totals(comp: pd.DataFrame, x: dict) -> dict:
+    carbon = phys = scar = 0.0
+    for t, r in comp.iterrows():
+        u, p = x[f"util_{t}"], x[f"pue_{t}"]
+        carbon = carbon + r["carbon"] * u * p
+        phys = phys + r["onsite"] * u * x["wue"] + (r["grid_nh"] * x["ewif"] + r["grid_h"] * x["hydro"]) * u * p
+        scar = scar + r["sc_onsite"] * u * x["wue"] + (r["sc_grid_nh"] * x["ewif"] + r["sc_grid_h"] * x["hydro"]) * u * p
+    return {"carbon": carbon, "phys": phys, "scarcity": scar,
+            "carbon_inference": carbon * x["inference"], "scarcity_inference": scar * x["inference"]}
+
+
+def _first_order(x: np.ndarray, y: np.ndarray, bins: int = 40) -> float:
+    q = np.quantile(x, np.linspace(0, 1, bins + 1))
+    idx = np.clip(np.searchsorted(q, x, side="right") - 1, 0, bins - 1)
+    means = np.array([y[idx == k].mean() for k in range(bins) if (idx == k).any()])
+    counts = np.array([(idx == k).sum() for k in range(bins) if (idx == k).any()])
+    return float(np.sum(counts * (means - y.mean()) ** 2) / len(y) / y.var()) if y.var() > 0 else 0.0
+
+
+def monte_carlo(account: pd.DataFrame, n: int = 4000, seed: int = 0) -> dict:
+    comp = _components(account)
+    b = _bands()
     rng = np.random.default_rng(seed)
-    s = {k: rng.uniform(*v, n) for k, v in _RANGES.items()}
-    carbon, phys, scarcity = _totals(b, s["util"], s["pue"], s["wue"], s["ewif"], s["inference"])
+    ranges = {}
+    for t in comp.index:
+        ranges[f"util_{t}"] = b["util"].get(t, b["util"]["unknown"])
+        ranges[f"pue_{t}"] = b["pue"].get(t, b["pue"]["unknown"])
+    ranges.update({"wue": b["wue"], "ewif": b["ewif"], "hydro": b["hydro"], "inference": b["inference"]})
+    s = {k: rng.uniform(lo, hi, n) for k, (lo, hi) in ranges.items()}
+    tot = _totals(comp, s)
 
-    def ci(x):
-        return {"mean": round(float(np.mean(x)), 0),
-                "p05": round(float(np.percentile(x, 5)), 0),
-                "p95": round(float(np.percentile(x, 95)), 0)}
+    def ci(v):
+        return {"mean": round(float(np.mean(v)), 0), "p05": round(float(np.percentile(v, 5)), 0),
+                "p95": round(float(np.percentile(v, 95)), 0)}
 
-    # one-at-a-time sensitivity on scarcity-weighted water (vary one, others=1.0)
-    sens = {}
-    base_args = {"u": 1.0, "p": 1.0, "w": 1.0, "e": 1.0, "i": 1.0}
-    for k, (lo, hi) in _RANGES.items():
-        _, _, s_lo = _totals(b, **{**base_args, **_map(k, lo)})
-        _, _, s_hi = _totals(b, **{**base_args, **_map(k, hi)})
-        sens[k] = round(abs(s_hi - s_lo) / 1e6, 1)      # Mm3-eq swing
+    base = {k: 1.0 for k in ranges} | {"inference": b["inference_default"]}
+    oat = {}
+    for k, (lo, hi) in ranges.items():
+        oat[k] = round(float(abs(_totals(comp, base | {k: hi})["scarcity_inference"]
+                           - _totals(comp, base | {k: lo})["scarcity_inference"])) / 1e6, 1)
+    sobol = {k: round(_first_order(s[k], tot["scarcity_inference"]), 3) for k in ranges}
     return {
-        "carbon_tco2_yr": ci(carbon),
-        "water_phys_m3_yr": ci(phys),
-        "scarcity_m3eq_yr": ci(scarcity),
-        "scarcity_sensitivity_Mm3eq_swing": dict(sorted(sens.items(), key=lambda kv: -kv[1])),
+        "n_samples": n,
+        "facility_types": {t: int(account.loc[account["facility_type"] == t, "facility_id"].nunique()) for t in comp.index},
+        "carbon_tco2_yr": ci(tot["carbon"]),
+        "carbon_inference_tco2_yr": ci(tot["carbon_inference"]),
+        "water_phys_m3_yr": ci(tot["phys"]),
+        "scarcity_m3eq_yr": ci(tot["scarcity"]),
+        "scarcity_inference_m3eq_yr": ci(tot["scarcity_inference"]),
+        "scarcity_at_hydro_0_m3eq_yr": round(float(_totals(comp, base | {"hydro": 0.0})["scarcity"]), 0),
+        "scarcity_sobol_first_order": dict(sorted(sobol.items(), key=lambda kv: -kv[1])),
+        "scarcity_oat_swing_Mm3eq": dict(sorted(oat.items(), key=lambda kv: -kv[1])),
     }
-
-
-def _map(param, val):
-    return {"u": val if param == "util" else 1.0, "p": val if param == "pue" else 1.0,
-            "w": val if param == "wue" else 1.0, "e": val if param == "ewif" else 1.0,
-            "i": val if param == "inference" else 1.0}
 
 
 if __name__ == "__main__":
-    from dcfootprint.io.facilities import _repo_root
     acct = pd.read_parquet(_repo_root() / "dcfootprint" / "outputs" / "account_facility_month.parquet")
-    r = monte_carlo(acct)
-    for k, v in r.items():
+    for k, v in monte_carlo(acct).items():
         print(k, "=", v)

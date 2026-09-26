@@ -51,6 +51,30 @@ def recharge_climatology(n_boot: int = 500, seed: int = 0) -> pd.DataFrame:
     })
 
 
+def basin_budgets(basin_ids, total_annual_l: float, rmult: dict | None = None) -> pd.DataFrame:
+    """[basin_id, month, budget_l] — stylised monthly water budget per basin, DECOUPLED
+    from datacenter use:
+        budget_b(m) = kappa * g3p_seasonal(m) * area_b / mean_m CF_b
+    AWARE CF = world-average / basin availability-minus-demand PER AREA, so area/CF is
+    proportional to the water remaining in the basin. kappa is one global scalar chosen so
+    the budgets sum to `total_annual_l` (routing.budget_scale x baseline scope-1 water)."""
+    from dcfootprint.geo import join as gj
+    if rmult is None:
+        rmult = recharge_climatology().set_index("month")["recharge_mult"].to_dict()
+    b = gj.load_aware_basins()
+    b = b[b["basin_id"].isin([int(x) for x in basin_ids])].copy()
+    cf_cols = [c for c in b.columns if c.startswith("CF_")]
+    b["cf_mean"] = b[cf_cols].mean(axis=1)
+    b["area_km2"] = b.to_crs("EPSG:6933").area / 1e6            # equal-area projection
+    b["weight"] = b["area_km2"] / b["cf_mean"]
+    rows = [{"basin_id": int(r.basin_id), "month": m, "raw": r.weight * rmult.get(m, 1.0),
+             "area_km2": r.area_km2, "cf_mean": r.cf_mean}
+            for r in b.itertuples() for m in range(1, 13)]
+    out = pd.DataFrame(rows)
+    out["budget_l"] = out["raw"] * total_annual_l / out["raw"].sum()
+    return out.drop(columns="raw")
+
+
 if __name__ == "__main__":
     r = recharge_climatology()
     print("seasonal recharge multiplier (mean=1.0):")
