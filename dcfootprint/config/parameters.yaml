@@ -30,8 +30,14 @@ energy:
 
 water_onsite:             # scope-1 WUE (L per kWh IT), fleet-average -> wide band
   wue_default:
-    default: 1.9          # industry avg (Green Grid / DATA.md E5)
-    band: [0.7, 9.0]      # efficient (NREL 0.7) .. evaporative high (9)
+    default: 1.9          # industry avg (Green Grid / DATA.md E5) — also the MC triangular mode
+    band: [0.7, 2.5]      # efficient (NREL 0.7) .. evaporative-cooling upper end 2.5
+    # Upper bound 2.5 L/kWh (decision 2026-09-27): Equinix, "What Is Water Usage Effectiveness
+    # (WUE) in Data Centers?" (blog, 2024-11-13): "0 L/kWh (with air cooling) or up to 2.5 L/kWh
+    # (with evaporative cooling)"; cf. Equinix 2025 Sustainability Report p.26: fleet WUE 0.91,
+    # evaporative sites 1.41. ISO/IEC 30134-9:2022 DEFINES WUE but sets no limits or targets.
+    # Replaces 9 L/kWh (Li et al. 2304.03271: on-site WUE 0.01-9 across sites/seasons, not an
+    # annual-average range).
   wue_by_operator:
     microsoft: 0.27
     meta: 0.19
@@ -177,7 +183,6 @@ siting:
 uncertainty:
   # triangular = mode at the point estimate, support = the sourced band (a best estimate exists)
   # uniform    = every value in the band equally likely (reported alongside as a sensitivity)
-  # NB the WUE upper bound 9 L/kWh is sourced (Li et al., "Making AI Less Thirsty": on-site WUE
-  # 0.01-9 L/kWh) but spans extreme sites/seasons, not annual fleet averages -> asymmetric tail.
+  # WUE band is [0.7, 2.5] with mode 1.9 (see water_onsite.wue_default for sources).
   distribution: triangular
   n_samples: 4000

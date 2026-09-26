@@ -224,7 +224,7 @@ def _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard
     if unc:
         L.append(f"## L8 Uncertainty\n- scarcity-weighted water 90% interval ({unc['distribution']} draws, mode = point estimate): "
                  f"{unc['scarcity_m3eq_yr']['p05']:,.0f} - {unc['scarcity_m3eq_yr']['p95']:,.0f} m3-eq/yr; MC mean = "
-                 f"{unc['scarcity_mean_over_point']}x the point estimate (right tail from the sourced WUE upper bound 9 L/kWh).\n"
+                 f"{unc['scarcity_mean_over_point']}x the point estimate (WUE band 0.7-2.5 L/kWh, mode 1.9).\n"
                  f"- first-order Sobol: {unc['scarcity_sobol_first_order']}.\n"
                  f"- **Sensitivity variant, no hydro reservoir evaporation:** {unc['scarcity_at_hydro_0_m3eq_yr']:,.0f} m3-eq/yr. "
                  f"The primary figure keeps Macknick 2012's hydro evaporation; attributing multi-purpose reservoir "

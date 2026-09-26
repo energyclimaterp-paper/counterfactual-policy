@@ -4,7 +4,7 @@ Absolute footprints rest on util/PUE/WUE/EWIF assumptions (red-team R1), so we p
 their bands (parameters.yaml) to intervals on the totals. Analytic scaling of the account
 components per facility type (fast, exact) rather than re-running the pipeline:
   carbon         ~ util_t * pue_t
-  onsite W       ~ util_t * wue
+  onsite W       ~ util_t * wue      (band 0.7-2.5 L/kWh around the 1.9 default)
   grid W (non-hydro) ~ util_t * pue_t * ewif
   grid W (hydro) ~ util_t * pue_t * hydro     (hydro multiplier on Macknick's 17,000 L/MWh)
   inference-attributed = total * inference_share
