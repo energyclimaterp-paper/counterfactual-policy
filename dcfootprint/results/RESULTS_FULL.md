@@ -20,7 +20,7 @@
 - top: **zero_liquid_discharge** ~1,286,963,017 m3-eq/yr (92.0% of baseline).
 
 ## L5 Policy-gap
-- **100%** of burden in a regulatory blind spot; axes mandated anywhere: 0/4.
+- **100%** of burden in a regulatory blind spot; axes mandated anywhere: 0/4. Evidence: RAG corpus of 15 cited policy docs (12 in force) across 10 jurisdictions — the regulated perimeter, none mandating the four axes.
 
 ## L6 Q3 Routing (stylised, Ceiling)
 - oracle saves 26.0% scarcity-water vs static; lyapunov keeps basin queue bounded. *Synthetic demand; conditional on R-hat.*

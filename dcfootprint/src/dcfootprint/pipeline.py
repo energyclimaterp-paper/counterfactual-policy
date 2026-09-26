@@ -79,10 +79,17 @@ def run() -> dict:
 
     # --- L5 policy-gap ---
     def _policy():
-        from dcfootprint.policy import gap
+        from dcfootprint.policy import gap, rag_bridge
         gap.four_axis_matrix().to_csv(RES / "regulation_matrix.csv", index=False)
         gap.HARD_CONSTRAINTS.to_csv(RES / "regulation_constraints.csv", index=False)
-        return gap.gap_overlay(account)
+        ov = gap.gap_overlay(account)
+        try:                                        # attach the RAG corpus as cited evidence
+            rag_bridge.load_manifest().to_csv(RES / "policy_corpus.csv", index=False)
+            rag_bridge.cited_constraints().to_csv(RES / "regulation_constraints_cited.csv", index=False)
+            ov["rag_corpus"] = rag_bridge.corpus_summary()
+        except Exception as e:
+            ov["rag_corpus"] = {"available": False, "reason": str(e)}
+        return ov
     gap_overlay = stage("L5 policy-gap", _policy)
 
     # --- L6 routing (Q3) ---
@@ -131,7 +138,14 @@ def _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard
     if levers_df is not None:
         top = levers_df.iloc[0]
         L.append(f"## L4 Counterfactual — which lever pays\n- top: **{top['lever']}** ~{top['water_scarcity_saved_m3eq_yr']:,.0f} m3-eq/yr ({top['pct_of_scarcity_baseline']}% of baseline).")
-    if gap_overlay: L.append(f"## L5 Policy-gap\n- **{gap_overlay['pct_burden_in_blind_spot']:.0f}%** of burden in a regulatory blind spot; axes mandated anywhere: {gap_overlay['axes_mandated_anywhere']}/4.")
+    if gap_overlay:
+        rc = gap_overlay.get("rag_corpus", {})
+        rc_line = (f" Evidence: RAG corpus of {rc['n_documents']} cited policy docs "
+                   f"({rc['n_in_force']} in force) across {len(rc['jurisdictions'])} jurisdictions — "
+                   f"the regulated perimeter, none mandating the four axes."
+                   if isinstance(rc, dict) and rc.get("n_documents") else "")
+        L.append(f"## L5 Policy-gap\n- **{gap_overlay['pct_burden_in_blind_spot']:.0f}%** of burden in a "
+                 f"regulatory blind spot; axes mandated anywhere: {gap_overlay['axes_mandated_anywhere']}/4.{rc_line}")
     if routing is not None:
         best = routing.sort_values("scarcity_saving_pct_vs_static").iloc[-1]
         L.append(f"## L6 Q3 Routing (stylised, Ceiling)\n- {best['policy']} saves {best['scarcity_saving_pct_vs_static']}% scarcity-water vs static; "
