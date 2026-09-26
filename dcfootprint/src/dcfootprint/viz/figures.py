@@ -60,9 +60,14 @@ def _map_axes(ax, states):
     ax.set_aspect("equal"); ax.set_axis_off()
 
 
+def _outputs(res: Path) -> Path:
+    """Snapshot folders keep outputs/ inside the results dir; a live run keeps them in dcfootprint/outputs."""
+    return res / "outputs" if (res / "outputs").exists() else _repo_root() / "dcfootprint" / "outputs"
+
+
 def _dc_cities(res: Path) -> pd.DataFrame:
-    acct = pd.read_parquet(res / "outputs" / "account_facility_month.parquet")
-    geo = pd.read_parquet(res / "outputs" / "interim" / "facilities_geocoded.parquet")[["facility_id", "latitude", "longitude"]]
+    acct = pd.read_parquet(_outputs(res) / "account_facility_month.parquet")
+    geo = pd.read_parquet(_outputs(res) / "interim" / "facilities_geocoded.parquet")[["facility_id", "latitude", "longitude"]]
     ann = (acct.groupby(["facility_id", "city"], as_index=False)["water_scarcity_l_eq"].sum()
            .merge(geo, on="facility_id"))
     return ann.groupby("city", as_index=False).agg(scarcity_m3eq=("water_scarcity_l_eq", lambda s: s.sum() / 1000),

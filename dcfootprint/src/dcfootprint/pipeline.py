@@ -84,6 +84,14 @@ def run() -> dict:
                       for m, vs in bt["fold_rmse"].items() for o, v in zip(bt["fold_origins"], vs)]
                      ).to_csv(RES / "forecast_backtest.csv", index=False)
         r["core_benchmark"] = forecast.core_benchmark()
+        from dcfootprint.project.hierarchy import chosen_onestep_ci
+        from dcfootprint.settings import params as _p
+        g = _p()["grid"]
+        ci, tab, method = chosen_onestep_ci(tuple(sorted(account["zone_id"].astype(str).unique())),
+                                            int(g["account_year"]), g["zone"])
+        tab.to_csv(RES / "forecast_ci_method_backtest.csv", index=False)
+        ci.to_csv(RES / "forecast_ci_onestep_q3.csv", index=False)
+        r["q3_method"] = method
         if r["core_benchmark"].get("rmse_by_model"):
             pd.DataFrame(r["core_benchmark"]["rmse_by_model"]).to_csv(RES / "forecast_core_benchmark.csv", index=False)
         return r

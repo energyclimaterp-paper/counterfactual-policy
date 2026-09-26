@@ -18,8 +18,8 @@ Policies
                constrained to per-basin queue peaks no worse than lyapunov's -> the best
                achievable penalty at the same water-sustainability level (a lower bound;
                there are no integer decisions, so the LP optimum is the MILP optimum)
-Controllers see the one-step CI forecast = seasonal naive (same month last year), the
-backtest winner in project/forecast.py; realised footprints use the true CI.
+Controllers see the one-step CI forecast from project/hierarchy.py (method chosen on
+2022-2023 backtests); realised footprints use the true CI.
 
 Legal hard limits (policy/gap.region_effects) apply when legal=True: ZLD mandates cut
 scope-1 water, renewable-share mandates cut carbon, bans stop added load.
@@ -44,12 +44,14 @@ def _params() -> dict:
 
 
 def _ci_forecast(account: pd.DataFrame) -> pd.Series:
-    """Seasonal-naive one-step CI forecast per row: same zone, same month, previous year."""
-    from dcfootprint.io import ember
+    """One-step CI forecast per row from the L3 pre-registered method (project/hierarchy.py:
+    chosen on 2022-2023 one-step backtests over the datacenter states; cached)."""
+    from dcfootprint.project.hierarchy import chosen_onestep_ci
     p = _cfg_params()["grid"]
-    prev = ember.zone_month_ci(ember.load_india_raw(), int(p["account_year"]) - 1, p["zone"])
-    m = account[["zone_id", "month"]].merge(prev, on=["zone_id", "month"], how="left")
-    return m["ci_gco2_per_kwh"].fillna(account["ci_gco2_per_kwh"].reset_index(drop=True)).values
+    zones = tuple(sorted(account["zone_id"].astype(str).unique()))
+    ci, _, _ = chosen_onestep_ci(zones, int(p["account_year"]), p["zone"])
+    m = account[["zone_id", "month"]].merge(ci[["zone_id", "month", "ci_hat"]], on=["zone_id", "month"], how="left")
+    return m["ci_hat"].fillna(account["ci_gco2_per_kwh"].reset_index(drop=True)).values
 
 
 def prepare(account: pd.DataFrame, legal: bool = True, budget_alpha: float | None = None,
