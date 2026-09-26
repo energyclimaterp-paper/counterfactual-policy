@@ -72,6 +72,11 @@ def facility_month_account(config: dict | None = None) -> pd.DataFrame:
     fac = pd.read_parquet(root / "dcfootprint" / "outputs" / "interim" / "facilities_geocoded.parquet")
     acct_fac = fac[(fac["status"] == "Operational") & fac["capacity_mw"].notna() & fac["basin_id"].notna()].copy()
     n_op_total = int((fac["status"] == "Operational").sum())
+    # Hyperscale cloud regions are EXCLUDED (decision 2026-09-27): no region-level capacity is
+    # publicly disclosed; announced investment figures are multi-year capital commitments, not
+    # operational MW, and are not used as a proxy. They drop out via capacity_mw = NaN; counted here.
+    op = fac[fac["status"] == "Operational"]
+    hyperscale_regions = op["operator_family"].fillna("").str.contains("hyperscale", case=False)
 
     g = grid_tables(zone, year)
     cf = pd.read_parquet(root / "dcfootprint" / "outputs" / "interim" / "basin_cf_monthly.parquet")
@@ -117,6 +122,10 @@ def facility_month_account(config: dict | None = None) -> pd.DataFrame:
         "account_year": year, "grid_zone": zone,
         "ci_mean_gco2_per_kwh": round(float((account["carbon_tco2"].sum() * 1000) / account["e_grid_mwh"].sum()), 1),
         "n_facilities": int(acct_fac["facility_id"].nunique()), "n_operational_total": n_op_total,
+        "n_hyperscale_regions_excluded": int(hyperscale_regions.sum()),
+        "n_hyperscale_regions_with_capacity": int((hyperscale_regions & op["capacity_mw"].notna()).sum()),
+        "n_operational_uncosted_other": int((~hyperscale_regions & op["capacity_mw"].isna()).sum()),
+        "n_operational_no_basin": int((op["capacity_mw"].notna() & op["basin_id"].isna()).sum()),
         "dropped_facility_months_no_cf": missing_cf,
         "ci_state_fill_months": int((account["ci_source"] != "ember_state").sum()) if zone == "state" else 0,
     }

@@ -229,10 +229,16 @@ def _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard
                  f"- **Sensitivity variant, no hydro reservoir evaporation:** {unc['scarcity_at_hydro_0_m3eq_yr']:,.0f} m3-eq/yr. "
                  f"The primary figure keeps Macknick 2012's hydro evaporation; attributing multi-purpose reservoir "
                  f"evaporation wholly to power is contested in the literature.")
+    meta = account.attrs.get("meta", {}) if account is not None else {}
     L.append("\n### Caveats\n- absolutes are calibrated ranges (util/PUE/WUE assumed); lead with relative/spatial results.\n"
              "- state CI is Ember generation-based (R2): small grids that import power show unrepresentative CI.\n"
              "- Q3 routing is a stylised controller (synthetic demand, budgets from AWARE AMD) — conditional on R-hat.\n"
-             "- All 71 costed facilities are colocation: the 11 hyperscaler cloud regions have no disclosed MW and are not in the account.\n"
+             f"- {meta.get('n_hyperscale_regions_excluded', '?')} hyperscale cloud regions excluded — capacity data not publicly "
+             "disclosed at region level; announced investment figures are multi-year capital commitments, not current "
+             "operational capacity, and are not used as a proxy. All facilities in the account are colocation. "
+             f"(Operational rows: {meta.get('n_operational_total', '?')}; in account {meta.get('n_facilities', '?')}; "
+             f"hyperscale regions excluded {meta.get('n_hyperscale_regions_excluded', '?')}; other rows without capacity "
+             f"{meta.get('n_operational_uncosted_other', '?')}; costed but no basin {meta.get('n_operational_no_basin', '?')}.)\n"
              "- Coordinates are city-centroids; GEM state tags are used without GADM verification.")
     (RES / "RESULTS_FULL.md").write_text("\n\n".join(L), encoding="utf-8")
     return RES / "RESULTS_FULL.md"
