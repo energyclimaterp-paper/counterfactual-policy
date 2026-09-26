@@ -30,7 +30,7 @@ class Facilities(pa.DataFrameModel):
     state: Series[str] = pa.Field(nullable=True)
     latitude: Series[float] = pa.Field(ge=-90, le=90, nullable=True)   # nullable until geocoded
     longitude: Series[float] = pa.Field(ge=-180, le=180, nullable=True)
-    capacity_mw: Series[float] = pa.Field(gt=0, le=2000, nullable=True)  # IT/operational MW
+    capacity_mw: Series[float] = pa.Field(gt=0, le=5000, nullable=True)  # disclosed MW; large values = verified announced campus/park totals (e.g. Lodha Palava 2500), not single operational buildings
     zone_id: Series[str] = pa.Field(nullable=True)   # carbon join key (ISO|state or ISO3)
     basin_id: Series["Int64"] = pa.Field(nullable=True)  # AWARE Basin_ID (post point-in-polygon)
 
