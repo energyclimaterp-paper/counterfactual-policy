@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from dcfootprint.io.facilities import _repo_root
+from dcfootprint.settings import params as _cfg_params
 
 _COLS = {"GEM unit/phase ID": "plant_id", "Type": "type", "Plant / Project name": "plant",
          "Capacity (MW)": "capacity_mw", "Status": "status", "Latitude": "latitude", "Longitude": "longitude",
@@ -21,10 +22,9 @@ _FOSSIL = {"coal", "oil/gas"}
 
 def load_plants(country: str = "India", status: str = "operating", path: str | Path | None = None) -> pd.DataFrame:
     """[type, plant, capacity_mw, status, latitude, longitude, state, fossil] for one country."""
-    import yaml
     root = _repo_root()
     if path is None:
-        params = yaml.safe_load((root / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+        params = _cfg_params()
         path = root / params["grid"]["gem_path"]
     path = Path(path)
     cache = path.with_name(f"gem_{country.lower()}_{status}_v2.parquet")
@@ -77,9 +77,8 @@ def assign_state_of_record(plants: pd.DataFrame) -> pd.DataFrame:
       5. otherwise                                    -> GADM state            (gadm)
     Names are normalised to Ember's spelling."""
     import geopandas as gpd
-    import yaml
     root = _repo_root()
-    gcfg = yaml.safe_load((root / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))["grid"]
+    gcfg = _cfg_params()["grid"]
     overrides = {str(k): v for k, v in (gcfg.get("gem_state_overrides") or {}).items()}
     ambiguous = {str(k): v for k, v in (gcfg.get("gem_state_ambiguous") or {}).items()}
     adm1 = gpd.read_file(root / gcfg["gadm_path"], layer="ADM_ADM_1")[["NAME_1", "geometry"]]

@@ -29,16 +29,16 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import yaml
 
 from dcfootprint.io.facilities import _repo_root
 from dcfootprint.account.energy import month_hours
+from dcfootprint.settings import params as _cfg_params
 
 CRITERIA = ["new_scarcity_m3eq", "new_carbon_tco2", "basin_pressure_m3", "grid_fossil_share"]
 
 
 def _cfg() -> dict:
-    return yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+    return _cfg_params()
 
 
 def candidate_cells(account: pd.DataFrame, g: dict) -> pd.DataFrame:

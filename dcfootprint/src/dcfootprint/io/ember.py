@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from dcfootprint.io.facilities import _repo_root
+from dcfootprint.settings import params as _cfg_params
 
 # Ember atomic-fuel Variable names that map 1:1 to parameters.yaml ewif_coeff keys.
 _FUELS = ["Coal", "Gas", "Nuclear", "Bioenergy", "Hydro", "Solar", "Wind",
@@ -99,7 +100,8 @@ def zone_month_ci(raw: pd.DataFrame, year: int, zone: str = "state") -> pd.DataF
         grid["ci_source"] = "ember_national"
     else:
         raise ValueError(f"unknown grid zone {zone!r} (state | national)")
-    return grid[["zone_id", "month", "ci_gco2_per_kwh", "ci_source"]]
+    from dcfootprint.validation import schemas
+    return schemas.EmberZoneMonth.validate(grid[["zone_id", "month", "ci_gco2_per_kwh", "ci_source"]])
 
 
 def zone_month_fuel_shares(raw: pd.DataFrame, year: int, zone: str = "state") -> pd.DataFrame:
@@ -120,7 +122,8 @@ def zone_month_fuel_shares(raw: pd.DataFrame, year: int, zone: str = "state") ->
     if zone == "national":
         out = pd.concat([nat.assign(zone_id=s) for s in states], ignore_index=True)
         out["share_source"] = "ember_national"
-        return out
+        from dcfootprint.validation import schemas
+        return schemas.FuelShares.validate(out)
     st = _shares(gen[gen["State"].isin(states)], "State").dropna(subset=["share"])
     have = set(map(tuple, st[["zone_id", "month"]].drop_duplicates().values))
     missing = [(s, m) for s in states for m in range(1, 13) if (s, m) not in have]
@@ -128,18 +131,19 @@ def zone_month_fuel_shares(raw: pd.DataFrame, year: int, zone: str = "state") ->
                      or [nat.iloc[0:0].assign(zone_id="")], ignore_index=True)
     st["share_source"] = "ember_state"
     fill["share_source"] = "ember_national_fill"
-    return pd.concat([st, fill], ignore_index=True)[["zone_id", "month", "fuel", "share", "share_source"]]
+    from dcfootprint.validation import schemas
+    return schemas.FuelShares.validate(
+        pd.concat([st, fill], ignore_index=True)[["zone_id", "month", "fuel", "share", "share_source"]])
 
 
 if __name__ == "__main__":
-    import yaml
     raw = load_india_raw()
     print("States:", sorted(map(str, raw["State"].dropna().unique()))[:30])
     print("State type:", raw["State type"].dropna().unique().tolist())
     shares = national_monthly_fuel_shares(raw)
     latest = shares[shares["date"] == shares["date"].max()].set_index("fuel")["share"].round(3)
     print(f"\nfuel shares @ {shares['date'].max().date()} (sum={latest.sum():.2f}):\n{latest.to_dict()}")
-    params = yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+    params = _cfg_params()
     ewif = monthly_ewif_l_per_mwh(shares, params["water_grid"]["ewif_coeff_L_per_MWh"])
     print("\nmonthly EWIF (L/MWh):\n", ewif.to_string(index=False))
     ci = national_monthly_ci(raw)

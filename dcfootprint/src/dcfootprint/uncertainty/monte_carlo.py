@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import yaml
 
 from dcfootprint.io.facilities import _repo_root
+from dcfootprint.settings import params as _cfg_params
 
 
 def _bands() -> dict:
-    p = yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+    p = _cfg_params()
     rel = lambda d: (d["band"][0] / d["default"], d["band"][1] / d["default"])
     return {
         "util": {t: rel(v) for t, v in p["energy"]["utilisation"]["by_facility_type"].items()},

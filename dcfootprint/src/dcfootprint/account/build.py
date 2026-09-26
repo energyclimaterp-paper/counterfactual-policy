@@ -19,11 +19,11 @@ from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
-import yaml
 
 from dcfootprint.io.facilities import _repo_root
 from dcfootprint.io import ember, gem
 from dcfootprint.account import energy as energy_mod, carbon as carbon_mod
+from dcfootprint.settings import params as _cfg_params
 
 _CONTRACT_COLS = ["facility_id", "date", "region", "e_it_mwh", "e_grid_mwh", "carbon_tco2",
                   "water_onsite_l", "water_grid_l", "water_phys_l",
@@ -32,7 +32,7 @@ _CONTRACT_COLS = ["facility_id", "date", "region", "e_it_mwh", "e_grid_mwh", "ca
 
 
 def load_params() -> dict:
-    return yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+    return _cfg_params()
 
 
 @lru_cache(maxsize=4)
@@ -50,6 +50,9 @@ def grid_tables(zone: str, year: int) -> dict:
     plants = gb.plant_basins(gem.load_plants("India"), basins)
     fuel_cf = gb.fuel_basin_cf(plants, cf, params["grid"]["gem_type_to_fuel"], zone)
     gw = gb.zone_month_grid_water(shares, fuel_cf, params["water_grid"]["ewif_coeff_L_per_MWh"], zone)
+    from dcfootprint.validation import schemas
+    schemas.GridWater.validate(gw)
+    schemas.GemPlants.validate(plants)
     return {"ci": ci, "shares": shares, "grid_water": gw, "plants": plants, "fuel_cf": fuel_cf, "basin_cf": cf}
 
 

@@ -64,7 +64,8 @@ def basin_budgets(basin_ids, alpha: float = 1.0) -> pd.DataFrame:
     r = load_remaining()
     r = r[r["basin_id"].isin([int(x) for x in basin_ids])].copy()
     r["budget_l"] = alpha * r["remaining_m3"].clip(lower=0) * 1000.0
-    return r[["basin_id", "month", "budget_l", "remaining_m3"]].reset_index(drop=True)
+    from dcfootprint.validation import schemas
+    return schemas.BasinBudget.validate(r[["basin_id", "month", "budget_l", "remaining_m3"]].reset_index(drop=True))
 
 
 if __name__ == "__main__":

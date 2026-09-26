@@ -35,7 +35,9 @@ def basin_monthly_cf(basins: gpd.GeoDataFrame) -> pd.DataFrame:
         id_vars="basin_id", value_vars=_CF_MONTHS, var_name="cf_month", value_name="cf")
     long["month"] = long["cf_month"].map({m: i + 1 for i, m in enumerate(_CF_MONTHS)})
     long = long.dropna(subset=["cf"])              # ocean / undefined basins have no CF
-    return long[["basin_id", "month", "cf"]].sort_values(["basin_id", "month"]).reset_index(drop=True)
+    from dcfootprint.validation import schemas
+    return schemas.BasinMonthlyCF.validate(
+        long[["basin_id", "month", "cf"]].sort_values(["basin_id", "month"]).reset_index(drop=True))
 
 
 def assign_basin(facilities: pd.DataFrame, basins: gpd.GeoDataFrame) -> pd.DataFrame:

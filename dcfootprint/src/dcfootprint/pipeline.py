@@ -25,6 +25,13 @@ OUT = ROOT / "dcfootprint" / "outputs"
 RES = ROOT / "dcfootprint" / "results"
 
 
+def _check(schema: str, df: pd.DataFrame) -> pd.DataFrame:
+    """Contract at the output boundary: a failing schema fails the stage (raises)."""
+    from dcfootprint.validation import schemas
+    getattr(schemas, schema).validate(df)
+    return df
+
+
 def run() -> dict:
     INTERIM.mkdir(parents=True, exist_ok=True)
     RES.mkdir(parents=True, exist_ok=True)
@@ -71,7 +78,7 @@ def run() -> dict:
     # --- L3 forecast + recharge ---
     def _forecast():
         from dcfootprint.project import forecast
-        r = forecast.forecast_ci(); r["forecast"].to_csv(RES / "forecast_ci.csv", index=False)
+        r = forecast.forecast_ci(); _check("ForecastCI", r["forecast"]).to_csv(RES / "forecast_ci.csv", index=False)
         bt = r["backtest"]
         pd.DataFrame([{"model": m, "fold_origin": o, "rmse": v}
                       for m, vs in bt["fold_rmse"].items() for o, v in zip(bt["fold_origins"], vs)]
@@ -104,7 +111,7 @@ def run() -> dict:
         with_l = lyapunov.compare(account, legal=True, A_basin=A_basin)
         without_l = lyapunov.compare(account, legal=False, A_basin=A_basin)
         r = pd.concat([with_l, without_l], ignore_index=True)
-        r.to_csv(RES / "routing_comparison.csv", index=False)
+        _check("RoutingComparison", r).to_csv(RES / "routing_comparison.csv", index=False)
         lyapunov.v_sweep(account, A_basin=A_basin).to_csv(RES / "routing_v_sweep.csv", index=False)
         bs = lyapunov.budget_sweep(account, A_basin=A_basin); bs.to_csv(RES / "routing_budget_sweep.csv", index=False)
         return {"table": r, "unstabilisable": with_l.attrs["n_unstabilisable_basins"],
@@ -116,19 +123,19 @@ def run() -> dict:
     # --- L7 decisions: levers, scorecard (Q2), siting (Q1) ---
     def _levers():
         from dcfootprint.counterfactual import levers
-        lv = levers.rank_lever_savings(account); lv.to_csv(RES / "lever_savings.csv", index=False); return lv
+        lv = _check("LeverSavings", levers.rank_lever_savings(account)); lv.to_csv(RES / "lever_savings.csv", index=False); return lv
     levers_df = stage("L7 levers (counterfactual)", _levers)
 
     def _scorecard():
         from dcfootprint.decisions import scorecard
-        s = scorecard.scorecard(account); s.to_csv(RES / "q2_scorecard.csv", index=False); return s
+        s = _check("Q2Scorecard", scorecard.scorecard(account)); s.to_csv(RES / "q2_scorecard.csv", index=False); return s
     scard = stage("L7 Q2 scorecard", _scorecard)
 
     def _siting():
         from dcfootprint.decisions import siting
         both = siting.rank_sites(account)
-        both["headline"].to_csv(RES / "q1_siting.csv", index=False)
-        both["small_grids"].to_csv(RES / "q1_siting_small_grids.csv", index=False)
+        _check("Q1Siting", both["headline"]).to_csv(RES / "q1_siting.csv", index=False)
+        _check("Q1Siting", both["small_grids"]).to_csv(RES / "q1_siting_small_grids.csv", index=False)
         return both
     sites = stage("L7 Q1 siting", _siting)
 

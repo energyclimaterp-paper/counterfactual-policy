@@ -40,18 +40,108 @@ class Facilities(pa.DataFrameModel):
 
 
 class EmberZoneMonth(pa.DataFrameModel):
-    """L0 carbon panel — zone x month (Ember). NOT facility-level: this is the
-    native partition that gets *applied* to facilities, never forecast per-facility."""
+    """L0 carbon panel — zone x month of the account year (io/ember.zone_month_ci). NOT
+    facility-level: the native partition that gets *applied* to facilities."""
     zone_id: Series[str]
-    date: Series[pa.DateTime]
-    ci_gco2_per_kwh: Series[float] = pa.Field(ge=0, le=1500, nullable=True)
-    generation_gwh: Series[float] = pa.Field(ge=0, nullable=True)
+    month: Series[int] = pa.Field(ge=1, le=12)
+    ci_gco2_per_kwh: Series[float] = pa.Field(ge=0, le=1500)
+    ci_source: Series[str] = pa.Field(isin=["ember_state", "ember_national_fill", "ember_national"])
 
     @pa.dataframe_check
     def unique_zone_month(cls, df: pd.DataFrame) -> bool:
-        return not df.duplicated(subset=["zone_id", "date"]).any()
+        return not df.duplicated(subset=["zone_id", "month"]).any()
 
     class Config:
+        coerce = True
+
+
+class FuelShares(pa.DataFrameModel):
+    """L0 generation shares — zone x month x fuel (io/ember.zone_month_fuel_shares)."""
+    zone_id: Series[str]
+    month: Series[int] = pa.Field(ge=1, le=12)
+    fuel: Series[str]
+    share: Series[float] = pa.Field(ge=0, le=1)
+
+    @pa.dataframe_check
+    def shares_sum_to_one(cls, df: pd.DataFrame) -> bool:
+        import numpy as np
+        return bool(np.allclose(df.groupby(["zone_id", "month"])["share"].sum(), 1.0, atol=1e-9))
+
+    class Config:
+        strict = False
+        coerce = True
+
+
+class GemPlants(pa.DataFrameModel):
+    """L0/L1 — GEM operating plants with basin and state of record (io/gem + geo/generation_basins)."""
+    plant_id: Series[str] = pa.Field(unique=True)
+    type: Series[str]
+    capacity_mw: Series[float] = pa.Field(gt=0)
+    latitude: Series[float] = pa.Field(ge=-90, le=90)
+    longitude: Series[float] = pa.Field(ge=-180, le=180)
+    basin_id: Series["Int64"]
+    state: Series[str] = pa.Field(nullable=True)          # NaN only for 'ambiguous'
+    state_source: Series[str] = pa.Field(isin=["gadm_agrees", "gadm", "override", "ambiguous", "gem_label_outside_gadm"])
+
+    @pa.dataframe_check
+    def only_ambiguous_has_no_state(cls, df: pd.DataFrame) -> bool:
+        return bool((df["state"].isna() == (df["state_source"] == "ambiguous")).all())
+
+    class Config:
+        strict = False
+        coerce = True
+
+
+class GridWater(pa.DataFrameModel):
+    """L1 — scope-2 water intensity per zone-month, physical and scarcity-weighted."""
+    zone_id: Series[str]
+    month: Series[int] = pa.Field(ge=1, le=12)
+    ewif_l_per_mwh: Series[float] = pa.Field(ge=0)
+    sewif_l_eq_per_mwh: Series[float] = pa.Field(ge=0)
+    ewif_hydro_l_per_mwh: Series[float] = pa.Field(ge=0)
+    sewif_hydro_l_eq_per_mwh: Series[float] = pa.Field(ge=0)
+
+    @pa.dataframe_check
+    def hydro_is_part_of_total(cls, df: pd.DataFrame) -> bool:
+        return bool(((df["ewif_hydro_l_per_mwh"] <= df["ewif_l_per_mwh"] + 1e-9)
+                     & (df["sewif_hydro_l_eq_per_mwh"] <= df["sewif_l_eq_per_mwh"] + 1e-6)).all())
+
+    @pa.dataframe_check
+    def unique_zone_month(cls, df: pd.DataFrame) -> bool:
+        return not df.duplicated(subset=["zone_id", "month"]).any()
+
+    class Config:
+        coerce = True
+
+
+class AwareRemaining(pa.DataFrameModel):
+    """L0 — AWARE 2.0 water remaining per basin-month (negative = over-committed)."""
+    basin_id: Series["Int64"]
+    month: Series[int] = pa.Field(ge=1, le=12)
+    amd_m3_per_m2: Series[float] = pa.Field(nullable=True)
+    area_m2: Series[float] = pa.Field(gt=0, nullable=True)
+    remaining_m3: Series[float] = pa.Field(nullable=True)
+
+    @pa.dataframe_check
+    def unique_basin_month(cls, df: pd.DataFrame) -> bool:
+        return not df.duplicated(subset=["basin_id", "month"]).any()
+
+    class Config:
+        coerce = True
+
+
+class BasinBudget(pa.DataFrameModel):
+    """L3/L6 — datacenter water budget per basin-month (project/recharge.basin_budgets)."""
+    basin_id: Series["Int64"]
+    month: Series[int] = pa.Field(ge=1, le=12)
+    budget_l: Series[float] = pa.Field(ge=0)
+
+    @pa.dataframe_check
+    def twelve_months_per_basin(cls, df: pd.DataFrame) -> bool:
+        return bool((df.groupby("basin_id")["month"].nunique() == 12).all())
+
+    class Config:
+        strict = False
         coerce = True
 
 
@@ -106,4 +196,80 @@ class FacilityMonthAccount(pa.DataFrameModel):
         return np.allclose(df["water_phys_l"], df["water_onsite_l"] + df["water_grid_l"], rtol=1e-6)
 
     class Config:
+        coerce = True
+
+
+# --------------------------------------------------------------------------- #
+# Decision-layer outputs (validated by pipeline.py before they are written)
+# --------------------------------------------------------------------------- #
+class LeverSavings(pa.DataFrameModel):
+    lever: Series[str] = pa.Field(unique=True)
+    type: Series[str] = pa.Field(isin=["reduction", "transparency"])
+    water_phys_saved_m3_yr: Series[float] = pa.Field(ge=0)
+    water_scarcity_saved_m3eq_yr: Series[float] = pa.Field(ge=0)
+    carbon_saved_tco2_yr: Series[float] = pa.Field(ge=0)
+    pct_of_scarcity_baseline: Series[float] = pa.Field(ge=0, le=100)
+
+    class Config:
+        strict = False
+
+
+class RoutingComparison(pa.DataFrameModel):
+    policy: Series[str] = pa.Field(isin=["static", "greedy", "lyapunov", "oracle", "lyapunov_pf"])
+    legal: Series[bool]
+    carbon_tco2: Series[float] = pa.Field(gt=0)
+    scarcity_m3eq: Series[float] = pa.Field(gt=0)
+    peak_basin_queue_m3: Series[float] = pa.Field(ge=0)
+    unserved_mwh: Series[float] = pa.Field(ge=0)
+    penalty_gap_pct_vs_oracle: Series[float]
+
+    @pa.dataframe_check
+    def oracle_bounds_lyapunov(cls, df: pd.DataFrame) -> bool:
+        """The offline oracle is a lower bound on lyapunov's penalty (same queue peaks)."""
+        return bool((df.loc[df["policy"] == "lyapunov", "penalty_gap_pct_vs_oracle"] >= -1e-6).all())
+
+    class Config:
+        strict = False
+
+
+class Q2Scorecard(pa.DataFrameModel):
+    facility_id: Series[str] = pa.Field(unique=True)
+    scarcity_pctile: Series[float] = pa.Field(ge=0, le=100)
+    carbon_pctile: Series[float] = pa.Field(ge=0, le=100)
+    harm_flag: Series[bool]
+    recommended_lever: Series[str]
+
+    class Config:
+        strict = False
+
+
+class Q1Siting(pa.DataFrameModel):
+    rank: Series[int] = pa.Field(ge=1, unique=True)
+    state: Series[str]
+    basin_id: Series[int]
+    max_regret: Series[float] = pa.Field(ge=0)
+    rank_p10: Series[float] = pa.Field(ge=1)
+    rank_p90: Series[float] = pa.Field(ge=1)
+    small_grid: Series[bool]
+
+    @pa.dataframe_check
+    def unique_cell(cls, df: pd.DataFrame) -> bool:
+        return not df.duplicated(subset=["state", "basin_id"]).any()
+
+    class Config:
+        strict = False
+
+
+class ForecastCI(pa.DataFrameModel):
+    date: Series[pa.DateTime]
+    ci_gco2_per_kwh: Series[float] = pa.Field(ge=0, le=1500)
+    lo: Series[float]
+    hi: Series[float]
+
+    @pa.dataframe_check
+    def band_brackets_mean(cls, df: pd.DataFrame) -> bool:
+        return bool(((df["lo"] <= df["ci_gco2_per_kwh"] + 1e-9) & (df["ci_gco2_per_kwh"] <= df["hi"] + 1e-9)).all())
+
+    class Config:
+        strict = False
         coerce = True

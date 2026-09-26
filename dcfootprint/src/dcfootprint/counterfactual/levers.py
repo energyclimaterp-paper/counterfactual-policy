@@ -20,9 +20,9 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import yaml
 
 from dcfootprint.io.facilities import _repo_root
+from dcfootprint.settings import params as _cfg_params
 
 # coastal DC hubs (seawater/WSAC eligible) — city-level proxy, flagged
 COASTAL = {"mumbai", "navi mumbai", "chennai", "visakhapatnam", "kolkata", "kochi", "mangalore", "surat"}
@@ -77,7 +77,7 @@ def _scarcity(d: pd.DataFrame, a: pd.DataFrame) -> pd.Series:
 
 
 def rank_lever_savings(account: pd.DataFrame | None = None) -> pd.DataFrame:
-    params = yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+    params = _cfg_params()
     lv = params["levers"]
     a = _backout(_load_account() if account is None else account)
     notes = {
@@ -113,7 +113,7 @@ def rank_lever_savings(account: pd.DataFrame | None = None) -> pd.DataFrame:
 def facility_lever_savings(account: pd.DataFrame | None = None) -> pd.DataFrame:
     """[facility_id, lever, scarcity_saved_m3eq_yr, carbon_saved_tco2_yr] — per-facility
     savings, used by the Q2 scorecard to recommend the lever that pays most for that facility."""
-    params = yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+    params = _cfg_params()
     a = _backout(_load_account() if account is None else account)
     rows = []
     for name, d in lever_deltas(a, params["levers"]).items():

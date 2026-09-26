@@ -31,23 +31,22 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import yaml
 from scipy import sparse
 from scipy.optimize import linprog
 
 from dcfootprint.io.facilities import _repo_root
 from dcfootprint.account.energy import month_hours
+from dcfootprint.settings import params as _cfg_params
 
 
 def _params() -> dict:
-    return yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))["routing"]
+    return _cfg_params()["routing"]
 
 
 def _ci_forecast(account: pd.DataFrame) -> pd.Series:
     """Seasonal-naive one-step CI forecast per row: same zone, same month, previous year."""
     from dcfootprint.io import ember
-    import yaml as _y
-    p = _y.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))["grid"]
+    p = _cfg_params()["grid"]
     prev = ember.zone_month_ci(ember.load_india_raw(), int(p["account_year"]) - 1, p["zone"])
     m = account[["zone_id", "month"]].merge(prev, on=["zone_id", "month"], how="left")
     return m["ci_gco2_per_kwh"].fillna(account["ci_gco2_per_kwh"].reset_index(drop=True)).values

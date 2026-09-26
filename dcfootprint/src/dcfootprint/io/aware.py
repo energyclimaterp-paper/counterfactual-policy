@@ -15,6 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 from dcfootprint.io.facilities import _repo_root
+from dcfootprint.settings import params as _cfg_params
 
 _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -22,8 +23,7 @@ _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
 def load_remaining(path: str | Path | None = None) -> pd.DataFrame:
     """[basin_id, month, amd_m3_per_m2, area_m2, remaining_m3]."""
     if path is None:
-        import yaml
-        p = yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
+        p = _cfg_params()
         path = _repo_root() / p["routing"]["aware_intermediate_path"]
     path = Path(path)
     cache = path.with_name("aware_amd_remaining.parquet")
@@ -36,5 +36,7 @@ def load_remaining(path: str | Path | None = None) -> pd.DataFrame:
     long = long.merge(area, on="Basin_ID", how="left").rename(columns={"Basin_ID": "basin_id"})
     long["remaining_m3"] = long["amd_m3_per_m2"] * long["area_m2"]
     out = long[["basin_id", "month", "amd_m3_per_m2", "area_m2", "remaining_m3"]].astype({"basin_id": "int64"})
+    from dcfootprint.validation import schemas
+    out = schemas.AwareRemaining.validate(out)
     out.to_parquet(cache)
     return out
