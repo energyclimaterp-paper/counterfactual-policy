@@ -1,0 +1,22 @@
+# ── Large / third-party datasets ── retrieved via context/DATA.md, NOT versioned
+#    (several files exceed GitHub's 100 MB limit; data/ is ~600 MB)
+/data/
+
+# ── Prior project ── separate git history + large data + scrubbed PII; not part of this repo
+/gat-based-forecasting/
+
+# ── Journal source captures ── not our work / possible copyright
+/Energy and Climate Change.md
+/Energy and Climate Change-organized.md
+
+# ── Scratch / generated ──
+/Claude outputs/
+dcfootprint/outputs/
+**/__pycache__/
+*.pyc
+.snakemake/
+.venv/
+venv/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
