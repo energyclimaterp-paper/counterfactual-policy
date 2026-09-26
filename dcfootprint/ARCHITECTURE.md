@@ -182,6 +182,13 @@ The account is **assumption-dominated** (a global utilisation×PUE scalar drives
 3. **Calibration:** does the bottom-up India total land near CEEW's independent ~1.8 GW? (validates magnitude)
 Any one can redirect the paper — cheaper to learn now than after implementation.
 
+### 6.5 GATE RESULTS (run 2026-09-26 on data in hand — scripts in `experiments/`)
+- **G1 CALIBRATION = PASS:** bottom-up operational **1.39 GW** (90 costed / 129 operational) vs CEEW/JLL **1.5–1.8 GW** → ratio 0.84 (+39 uncosted → ~1.0). C1 magnitude validated against an independent source.
+- **G2 COVERAGE = PLAUSIBLE (caveat):** Mumbai/Navi 31% ≈ CEEW ~25%; **BUT ~61% of capacity sits in 3 mega-sites** (Navi Mumbai 25% · Palava 20% · Vizag 16%) → the hotspot ranking hinges on a few large facilities. ATLAS city field 57% blank (coarse gap-filler only).
+- **G3 RQ2 = scarcity-weighting does NOT re-rank (ANNUAL):** Spearman(unweighted,weighted) **0.91 state / 0.95 basin**; top-5 overlap **5/5**; MC(400) tight [0.90–0.96]; worst regions (Maharashtra/Andhra/Telangana/Tamil-Nadu) **identical** weighted vs unweighted. Scarcity CF varies (1.6–78.9) — not flat; capacity & scarcity are **positively correlated**.
+- **★ THE REFRAME (do not lose):** headline is NOT "scarcity-weighting re-ranks." It IS **"India's AI datacenters are disproportionately sited in already-water-stressed basins — weighting doesn't move the hotspot ranking because the hotspots ARE the stressed basins."** C4 → "we tested method-sensitivity; for India, average is adequate to flag hotspots *because siting coincides with stress*" — clean, no-assumptions, policy-relevant. Spine (C1/C5/C8) intact. (Red-team S4 anticipated this.)
+- **PENDING (decisive):** **seasonal Gate 3 (monthly CF, not annual)** — does dry-season scarcity re-rank? (C3's "when" may carry the signal annual lost). Forecasting-backtest gate still un-run. G3 first-pass caveats: city-centroid geocode, annual CF, 124 matched facilities, capacity-concentrated.
+
 ---
 
 ## 7. CONTRIBUTIONS (tiered) + full-potential architecture (2026-09-26)
