@@ -6,7 +6,7 @@ as a first, honest geocode (precise siting is a later, per-facility step in
 ``geo/geocode.py``). One row per facility; the facility is the join key for the
 whole account.
 
-Design (mirrors account/water.py):
+Design (same pattern as the account/ modules):
   * pure-ish: reads declared inputs, returns a DataFrame; the DAG writes it.
   * config-driven paths, resolved from the repo root (runnable standalone too).
   * output validated against schemas.Facilities before it leaves this module.

@@ -53,8 +53,10 @@ def _ci_forecast(account: pd.DataFrame) -> pd.Series:
     return m["ci_gco2_per_kwh"].fillna(account["ci_gco2_per_kwh"].reset_index(drop=True)).values
 
 
-def prepare(account: pd.DataFrame, legal: bool = True, budget_alpha: float | None = None) -> dict:
-    """Facility x month arrays (facilities sorted by id) + incidence + budgets."""
+def prepare(account: pd.DataFrame, legal: bool = True, budget_alpha: float | None = None,
+            A_basin: pd.DataFrame | None = None) -> dict:
+    """Facility x month arrays (facilities sorted by id) + incidence + budgets. `A_basin` is the
+    L4 facility x basin incidence from the pipeline (built here from the account if omitted)."""
     from dcfootprint.geo.incidence import build_incidence
     from dcfootprint.policy.gap import region_effects
     from dcfootprint.project.recharge import basin_budgets
@@ -82,8 +84,11 @@ def prepare(account: pd.DataFrame, legal: bool = True, budget_alpha: float | Non
     a["max_e_it"] = a["capacity_mw"] * float(rp["max_util"]) * a["month"].map(hrs)
 
     fac = a.drop_duplicates("facility_id")[["facility_id", "basin_id", "state"]].assign(zone_id=lambda d: d["state"])
-    _, A_basin = build_incidence(fac)
+    if A_basin is None:
+        _, A_basin = build_incidence(fac)
     A_basin = A_basin.reindex(sorted(fac["facility_id"])).fillna(0)
+    A_basin = A_basin.loc[:, A_basin.sum(axis=0) > 0]                  # basins that hold an account facility
+    assert (A_basin.sum(axis=1) == 1).all(), "every facility must sit in exactly one basin"
     F, B = A_basin.shape
 
     def mat(col):                                   # F x 12
@@ -248,6 +253,13 @@ def oracle(P: dict, qcap: np.ndarray, seed: int = 0) -> dict:
     return _score(P, "oracle", X, Dhist, pools)
 
 
+def _unserved(demand: float, served: float) -> float:
+    """Demand not placed (MWh). Differences below float precision of the totals (~1e-10 MWh on
+    ~1e7 MWh) are summation residue, not unserved load, and are reported as exactly 0."""
+    gap = demand - served
+    return float(gap) if gap > 1e-9 * max(abs(demand), 1.0) else 0.0
+
+
 def _score(P, policy, X, Dhist, pools):
     arr = P["arr"]
     return {"policy": policy,
@@ -256,15 +268,15 @@ def _score(P, policy, X, Dhist, pools):
             "penalty": float((X * arr["cost_true"]).sum() / arr["e_it_mwh"].sum()),   # per MWh-IT, normalised
             "peak_basin_queue_m3": float(Dhist.max() / 1000.0),
             "end_backlog_m3": float(Dhist[:, -1].sum() / 1000.0),
-            "unserved_mwh": float(max(0.0, pools.sum() + (1 - _params()["flexible_share"]) * arr["e_it_mwh"].sum() - X.sum())),
+            "unserved_mwh": _unserved(pools.sum() + (1 - _params()["flexible_share"]) * arr["e_it_mwh"].sum(), X.sum()),
             "_qpeak_by_basin": Dhist.max(axis=1)}
 
 
 def compare(account: pd.DataFrame, seeds: int | None = None, legal: bool = True,
-            budget_alpha: float | None = None) -> pd.DataFrame:
+            budget_alpha: float | None = None, A_basin: pd.DataFrame | None = None) -> pd.DataFrame:
     rp = _params()
     seeds = int(rp["seeds"]) if seeds is None else seeds
-    P = prepare(account, legal=legal, budget_alpha=budget_alpha)
+    P = prepare(account, legal=legal, budget_alpha=budget_alpha, A_basin=A_basin)
     runs = []
     for s in range(seeds):
         for pol in ["static", "greedy", "lyapunov", "lyapunov_pf"]:
@@ -293,11 +305,11 @@ def compare(account: pd.DataFrame, seeds: int | None = None, legal: bool = True,
     return out
 
 
-def v_sweep(account: pd.DataFrame, seeds: int | None = None) -> pd.DataFrame:
+def v_sweep(account: pd.DataFrame, seeds: int | None = None, A_basin: pd.DataFrame | None = None) -> pd.DataFrame:
     """Lyapunov penalty vs peak queue across V (theory: gap O(1/V), queue O(V))."""
     rp = _params()
     seeds = int(rp["seeds"]) if seeds is None else seeds
-    P = prepare(account, legal=True)
+    P = prepare(account, legal=True, A_basin=A_basin)
     rows = []
     for V in rp["v_sweep"]:
         rs = [simulate(P, "lyapunov", seed=s, V=float(V)) for s in range(seeds)]
@@ -307,12 +319,12 @@ def v_sweep(account: pd.DataFrame, seeds: int | None = None) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def budget_sweep(account: pd.DataFrame, alphas=None, seeds: int = 5) -> pd.DataFrame:
+def budget_sweep(account: pd.DataFrame, alphas=None, seeds: int = 5, A_basin: pd.DataFrame | None = None) -> pd.DataFrame:
     """Q3 is conditional on R_hat: how the comparison moves with the sector share alpha."""
     alphas = _params()["budget_sweep_alpha"] if alphas is None else alphas
     rows = []
     for al in alphas:
-        r = compare(account, seeds=seeds, legal=True, budget_alpha=float(al)).set_index("policy")
+        r = compare(account, seeds=seeds, legal=True, budget_alpha=float(al), A_basin=A_basin).set_index("policy")
         rows.append({"budget_alpha": al, "unstabilisable_basins": r.attrs["n_unstabilisable_basins"],
                      "overdraft_basin_months": r.attrs["overdraft_basin_months"],
                      "fixed_only_peak_queue_m3": r.attrs["fixed_only_peak_queue_m3"],

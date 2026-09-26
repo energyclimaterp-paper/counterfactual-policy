@@ -76,7 +76,7 @@ dcfootprint/
 
 ## Build order & status
 - **Scaffolded now:** package structure, `pyproject.toml`, both configs, `validation/schemas.py` (the contracts),
-  `account/water.py` (reference equation), `workflow/Snakefile` (the DAG).
+  `account/build.py` (the account equations, inline), `workflow/Snakefile` (the DAG).
 - **Next (in spine order):** `io/facilities.py` (merge our-list ⋈ ATLAS coords ⋈ CEA plant data — the L0 bottleneck)
   → `geo/join.py` (zone + basin assignment) → `account/{energy,carbon}.py` → `counterfactual/levers.py`.
   Parallel: `policy/gap.py`, `io/ember.py`, `io/aware.py`.

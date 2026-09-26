@@ -64,7 +64,8 @@ def run() -> dict:
     account = stage("L2 account", _account)
 
     # --- L4 incidence (exact coupling; consumed by L6 routing) + L2.5 calibration ---
-    stage("L4 incidence", lambda: __import__("dcfootprint.geo.incidence", fromlist=["build_incidence"]).build_incidence(fac_geo))
+    incidence = stage("L4 incidence", lambda: __import__("dcfootprint.geo.incidence", fromlist=["build_incidence"]).build_incidence(fac_geo))
+    A_basin = incidence[1] if incidence is not None else None
     cal = stage("L2.5 calibrate", lambda: __import__("dcfootprint.account.calibrate", fromlist=["calibrate_capacity"]).calibrate_capacity(fac_geo))
 
     # --- L3 forecast + recharge ---
@@ -100,12 +101,12 @@ def run() -> dict:
     # --- L6 routing (Q3), with and without legal limits ---
     def _routing():
         from dcfootprint.routing import lyapunov
-        with_l = lyapunov.compare(account, legal=True)
-        without_l = lyapunov.compare(account, legal=False)
+        with_l = lyapunov.compare(account, legal=True, A_basin=A_basin)
+        without_l = lyapunov.compare(account, legal=False, A_basin=A_basin)
         r = pd.concat([with_l, without_l], ignore_index=True)
         r.to_csv(RES / "routing_comparison.csv", index=False)
-        lyapunov.v_sweep(account).to_csv(RES / "routing_v_sweep.csv", index=False)
-        bs = lyapunov.budget_sweep(account); bs.to_csv(RES / "routing_budget_sweep.csv", index=False)
+        lyapunov.v_sweep(account, A_basin=A_basin).to_csv(RES / "routing_v_sweep.csv", index=False)
+        bs = lyapunov.budget_sweep(account, A_basin=A_basin); bs.to_csv(RES / "routing_budget_sweep.csv", index=False)
         return {"table": r, "unstabilisable": with_l.attrs["n_unstabilisable_basins"],
                 "n_basins": with_l.attrs["n_basins"], "overdraft": with_l.attrs["overdraft_basin_months"],
                 "alpha": with_l.attrs["budget_alpha"], "fixed_floor": with_l.attrs["fixed_only_peak_queue_m3"],
@@ -115,7 +116,7 @@ def run() -> dict:
     # --- L7 decisions: levers, scorecard (Q2), siting (Q1) ---
     def _levers():
         from dcfootprint.counterfactual import levers
-        lv = levers.rank_lever_savings(); lv.to_csv(RES / "lever_savings.csv", index=False); return lv
+        lv = levers.rank_lever_savings(account); lv.to_csv(RES / "lever_savings.csv", index=False); return lv
     levers_df = stage("L7 levers (counterfactual)", _levers)
 
     def _scorecard():

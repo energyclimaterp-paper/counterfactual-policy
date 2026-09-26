@@ -76,10 +76,10 @@ def _scarcity(d: pd.DataFrame, a: pd.DataFrame) -> pd.Series:
     return d["d_onsite_l"] * a["cf"] + d["d_grid_l"] * a["cf_grid_eff"]
 
 
-def rank_lever_savings(config: dict | None = None) -> pd.DataFrame:
+def rank_lever_savings(account: pd.DataFrame | None = None) -> pd.DataFrame:
     params = yaml.safe_load((_repo_root() / "dcfootprint" / "config" / "parameters.yaml").read_text(encoding="utf-8"))
     lv = params["levers"]
-    a = _backout(_load_account())
+    a = _backout(_load_account() if account is None else account)
     notes = {
         "coastal_seawater_siting": f"WUE->{lv['coastal_seawater_siting']['new_wue']} at coastal hubs (scope-1); "
                                    f"{int(a['city'].fillna('').str.lower().isin(COASTAL).sum() / 12)} facilities eligible",
