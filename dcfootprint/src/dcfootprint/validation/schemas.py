@@ -261,6 +261,21 @@ class Q1Siting(pa.DataFrameModel):
         strict = False
 
 
+class AqueductBasinScores(pa.DataFrameModel):
+    """Aqueduct 4.0 water-stress score per AWARE basin and scenario (project/scarcity_future.py)."""
+    basin_id: Series[int]
+    scenario: Series[str] = pa.Field(isin=["baseline", "bau30", "opt30", "pes30", "bau50", "opt50", "pes50"])
+    ws_score: Series[float] = pa.Field(ge=0, le=5, nullable=True)          # NaN = no Aqueduct score over the basin
+    scored_share: Series[float] = pa.Field(ge=0, le=1.01)                   # share of basin area with a score
+
+    @pa.dataframe_check
+    def unique_basin_scenario(cls, df: pd.DataFrame) -> bool:
+        return not df.duplicated(subset=["basin_id", "scenario"]).any()
+
+    class Config:
+        strict = False
+
+
 class ForecastCI(pa.DataFrameModel):
     date: Series[pa.DateTime]
     ci_gco2_per_kwh: Series[float] = pa.Field(ge=0, le=1500)

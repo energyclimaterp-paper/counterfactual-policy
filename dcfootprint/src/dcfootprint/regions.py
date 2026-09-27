@@ -105,6 +105,8 @@ def run_region(region: str) -> dict:
         _check("Q1Siting", both["headline"]).to_csv(res / "q1_siting.csv", index=False)
         if len(both["small_grids"]):
             _check("Q1Siting", both["small_grids"]).to_csv(res / "q1_siting_small_grids.csv", index=False)
+        if len(both["scenarios"]):
+            _check("Q1Siting", both["scenarios"]).to_csv(res / "q1_siting_scenarios.csv", index=False)
         return both
     q1 = stage(f"{region} L7 Q1 siting", _q1)
 
@@ -163,6 +165,9 @@ def _report(region, res, account, cal, lv, q2, q1, rt, unc) -> Path:
         h = q1["headline"]
         L.append(f"## Q1 siting\n- {len(h)} candidate cells on grids >= 10 TWh/yr; top 5: "
                  + "; ".join(f"{r['state']} basin {int(r['basin_id'])}" for _, r in h.head(5).iterrows()))
+        from dcfootprint.decisions.siting import scenario_summary
+        if len(q1.get("scenarios", [])):
+            L.append(scenario_summary(q1))
     if rt is not None:
         t = rt["table"]; t = t[t["legal"]].set_index("policy")
         L.append(f"## Q3 routing (stylised)\n- scarcity water saved vs static: greedy {t.loc['greedy', 'scarcity_saving_pct_vs_static']}%, "

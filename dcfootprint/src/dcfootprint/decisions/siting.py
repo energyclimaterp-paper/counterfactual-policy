@@ -19,7 +19,12 @@ PUE mandates change the new facility's footprint. Ranked with AND without legal 
 Weights are Dirichlet-sampled; cells are ranked by MINIMAX REGRET (worst-case gap to the
 best cell across weightings), with mean rank and a p10-p90 rank band as the stability
 check. Output = regions with reasons, not plots (land, fibre and interconnection queues
-are not in the data). 2030/2050 scenarios (Aqueduct future, CI path) are not yet included.
+are not in the data).
+
+2030/2050 scenarios (a separate table; the headline ranking is unchanged): a fifth criterion,
+the basin's Aqueduct 4.0 0-5 water-stress score (project/scarcity_future.py), takes seven values
+(baseline, bau/opt/pes x 2030/2050); regret is taken over weights x scenarios and the worst case
+kept. Carbon has no scenario (no sourced CI path), so it stays at the account year.
 
 States generating < siting.small_grid_twh a year are ranked in a SEPARATE table: their
 Ember CI is their own (often hydro-only) generation, not what a new 50 MW load would draw
@@ -157,9 +162,50 @@ def _minimax(cells: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
     return c.sort_values(["max_regret", "mean_rank"])
 
 
-def _rank(legal_cells: pd.DataFrame, nolegal_cells: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
-    with_legal = _minimax(legal_cells, n, seed).reset_index(drop=True)
-    no_legal = _minimax(nolegal_cells, n, seed)
+def _with_ws(cells: pd.DataFrame) -> pd.DataFrame:
+    """Attach the Aqueduct 0-5 score per scenario (ws_<scenario>) and the lowest scored share;
+    cells whose basin has no score in some scenario are dropped (counted by the caller)."""
+    from dcfootprint.project.scarcity_future import SCENARIOS, basin_scores
+    s = basin_scores(cells["basin_id"].unique())
+    wide = s.pivot(index="basin_id", columns="scenario", values="ws_score").add_prefix("ws_")[[f"ws_{x}" for x in SCENARIOS]]
+    share = s.groupby("basin_id")["scored_share"].min().rename("ws_scored_share_min")
+    out = cells.merge(wide, left_on="basin_id", right_index=True, how="left").merge(share, left_on="basin_id", right_index=True, how="left")
+    return out.dropna(subset=list(wide.columns))
+
+
+def _minimax_scenarios(cells: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
+    """Minimax regret over weights x water scenarios. Criteria = the four baseline criteria plus the
+    basin's Aqueduct score under the scenario (carbon has no scenario). The score is min-max scaled
+    over ALL scenarios jointly, so a basin that worsens in 2050 moves on one common scale."""
+    from dcfootprint.project.scarcity_future import SCENARIOS
+    c = cells[~cells["excluded"]].copy()
+    X = c[CRITERIA].values.astype(float)
+    rng_ = X.max(0) - X.min(0)
+    Xn = np.where(rng_ > 0, (X - X.min(0)) / np.where(rng_ > 0, rng_, 1), 0.0)
+    WS = c[[f"ws_{s}" for s in SCENARIOS]].values.astype(float)
+    span = WS.max() - WS.min()
+    WSn = (WS - WS.min()) / span if span > 0 else np.zeros_like(WS)
+    W = np.random.default_rng(seed).dirichlet(np.ones(len(CRITERIA) + 1), n)         # n x (k+1)
+    regret_s, ranks = [], []
+    for j in range(len(SCENARIOS)):
+        S = np.hstack([Xn, WSn[:, [j]]]) @ W.T                                        # cells x n
+        regret_s.append((S - S.min(axis=0, keepdims=True)).max(axis=1))
+        ranks.append(S.argsort(axis=0).argsort(axis=0) + 1)
+    R = np.column_stack(regret_s)                                                     # cells x scenarios
+    ranks = np.hstack(ranks)
+    c["max_regret"] = R.max(axis=1)
+    c["worst_scenario"] = np.array(SCENARIOS)[R.argmax(axis=1)]
+    for j, s in enumerate(SCENARIOS):
+        c[f"max_regret_{s}"] = R[:, j]
+    c["mean_rank"] = ranks.mean(axis=1)
+    c["rank_p10"] = np.percentile(ranks, 10, axis=1)
+    c["rank_p90"] = np.percentile(ranks, 90, axis=1)
+    return c.sort_values(["max_regret", "mean_rank"])
+
+
+def _rank(legal_cells: pd.DataFrame, nolegal_cells: pd.DataFrame, n: int, seed: int, minimax=_minimax) -> pd.DataFrame:
+    with_legal = minimax(legal_cells, n, seed).reset_index(drop=True)
+    no_legal = minimax(nolegal_cells, n, seed)
     no_legal["rank_nolegal"] = np.arange(1, len(no_legal) + 1)
     out = with_legal.merge(no_legal[["state", "basin_id", "rank_nolegal"]], on=["state", "basin_id"], how="left")
     out.insert(0, "rank", np.arange(1, len(out) + 1))
@@ -172,13 +218,41 @@ def _rank(legal_cells: pd.DataFrame, nolegal_cells: pd.DataFrame, n: int, seed: 
 def rank_sites(account: pd.DataFrame, n_weight_samples: int | None = None, seed: int = 0) -> dict:
     """{'headline': cells on grids >= small_grid_twh, ranked among themselves,
         'small_grids': the excluded small-grid cells, ranked among themselves (caveat: own-
-        generation CI is not what a new datacenter would draw)}."""
+        generation CI is not what a new datacenter would draw),
+        'scenarios': headline-grid cells ranked by minimax regret over weights x Aqueduct
+        2030/2050 water scenarios, with the headline rank alongside (rank_headline);
+        'scenario_unscored': headline cells dropped for lacking an Aqueduct score}."""
     n = int(_cfg()["siting"]["weight_samples"]) if n_weight_samples is None else n_weight_samples
     lc, nc = score_cells(account, legal=True), score_cells(account, legal=False)
     big = lambda d: d[~d["small_grid"]]
     small = lambda d: d[d["small_grid"]]
-    return {"headline": _rank(big(lc), big(nc), n, seed),
-            "small_grids": _rank(small(lc), small(nc), n, seed)}
+    headline = _rank(big(lc), big(nc), n, seed)
+    lw, nw = _with_ws(big(lc)), _with_ws(big(nc))
+    scen = _rank(lw, nw, n, seed, minimax=_minimax_scenarios)
+    scen = scen.merge(headline[["state", "basin_id", "rank"]].rename(columns={"rank": "rank_headline"}),
+                      on=["state", "basin_id"], how="left")
+    unscored = big(lc).merge(lw[["state", "basin_id"]], on=["state", "basin_id"], how="left", indicator=True)
+    return {"headline": headline,
+            "small_grids": _rank(small(lc), small(nc), n, seed),
+            "scenarios": scen,
+            "scenario_unscored": unscored[unscored["_merge"] == "left_only"].drop(columns="_merge")}
+
+
+def scenario_summary(both: dict, top: int = 5) -> str:
+    """Report text for the 2030/2050 scenario table (shared by pipeline.py and regions.py)."""
+    s, h = both["scenarios"], both["headline"]
+    if not len(s):
+        return ""
+    top_h = set(zip(h.head(top)["state"], h.head(top)["basin_id"]))
+    kept = sum((a, b) in top_h for a, b in zip(s.head(top)["state"], s.head(top)["basin_id"]))
+    lines = [f"  {int(r['rank'])}. {r['state']} basin {int(r['basin_id'])} (headline #{int(r['rank_headline'])}): "
+             f"Aqueduct score {r['ws_baseline']:.2f} now -> {r['ws_bau50']:.2f} bau 2050 "
+             f"(pes 2050 {r['ws_pes50']:.2f}); worst case in {r['worst_scenario']}"
+             for _, r in s.head(top).iterrows()]
+    return (f"- **2030/2050 water scenarios** (q1_siting_scenarios.csv): minimax regret over weights x 7 Aqueduct 4.0 "
+            f"scenarios (baseline, bau/opt/pes x 2030/2050; 0-5 scores as a fifth criterion; carbon held at the account "
+            f"year). {len(s)} cells scored, {len(both['scenario_unscored'])} without a score; {kept} of the headline "
+            f"top {top} stay in the scenario top {top}:\n" + "\n".join(lines))
 
 
 if __name__ == "__main__":

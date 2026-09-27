@@ -144,6 +144,7 @@ class Siting(_M):
     new_facility_type: str
     weight_samples: int = Field(ge=10)
     small_grid_twh: float = Field(ge=0)
+    aqueduct_gdb_path: str = "data/aqueduct/Aq40_Y2023D07M05.gdb"
 
 
 class Uncertainty(_M):

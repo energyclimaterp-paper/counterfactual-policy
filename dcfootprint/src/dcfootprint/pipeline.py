@@ -144,6 +144,7 @@ def run() -> dict:
         both = siting.rank_sites(account)
         _check("Q1Siting", both["headline"]).to_csv(RES / "q1_siting.csv", index=False)
         _check("Q1Siting", both["small_grids"]).to_csv(RES / "q1_siting_small_grids.csv", index=False)
+        _check("Q1Siting", both["scenarios"]).to_csv(RES / "q1_siting_scenarios.csv", index=False)
         return both
     sites = stage("L7 Q1 siting", _siting)
 
@@ -238,6 +239,9 @@ def _write_report(account, cal, fc, rech, levers_df, gap_overlay, routing, scard
                  + (f"\n- Excluded small grids ({len(sg)} cells, q1_siting_small_grids.csv): own-generation CI "
                     f"(e.g. {sg.iloc[0]['state']} {sg.iloc[0]['ci_mean']:.0f} g/kWh) is not what a new load would draw; "
                     f"reported, not recommended." if len(sg) else ""))
+        from dcfootprint.decisions.siting import scenario_summary
+        if len(sites.get("scenarios", [])):
+            L.append(scenario_summary(sites))
     if unc:
         L.append(f"## L8 Uncertainty\n- scarcity-weighted water 90% interval ({unc['distribution']} draws, mode = point estimate): "
                  f"{unc['scarcity_m3eq_yr']['p05']:,.0f} - {unc['scarcity_m3eq_yr']['p95']:,.0f} m3-eq/yr; MC mean = "

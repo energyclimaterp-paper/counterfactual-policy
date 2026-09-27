@@ -186,6 +186,10 @@ siting:
   small_grid_twh: 10        # states generating < this (TWh/yr) are flagged: their own-generation CI is not what a DC would draw
   # candidate cells = (state x AWARE basin) cells holding >=1 operating GEM plant,
   # plus every cell that already holds a datacenter
+  # 2030/2050 scenarios: Aqueduct 4.0 0-5 water-stress scores (baseline bws_score vs future ws_x_s,
+  # bau/opt/pes x 2030/2050) as a fifth criterion; minimax regret over weights x scenarios.
+  # Scores not raw ratios: raw ws is capped at 1 and futures are bias-corrected to baseline (Kuzma et al. 2023 pp.10-11)
+  aqueduct_gdb_path: "data/aqueduct/Aq40_Y2023D07M05.gdb"
 
 # ---------------------------------------------------------------------------
 # L8 UNCERTAINTY
