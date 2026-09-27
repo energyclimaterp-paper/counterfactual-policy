@@ -1,110 +1,112 @@
-# dcfootprint — architecture & build plan
+# dcfootprint: the pipeline
 
-The reproducible **instrument** behind the paper: an open, sub-national, inference-attributed
-**joint carbon + scarcity-weighted-water account** of AI datacenters (India deep · US solid · EU light),
-and a **counterfactual policy engine** that quantifies what water/carbon policy levers would save.
-(Research direction & rationale: `../context/RESEARCH_GAPS.md`; data: `../context/DATA.md`.)
+The Python package behind the paper. It turns raw public data into a facility-month carbon and water account,
+then answers Q1 (siting), Q2 (scorecard) and Q3 (routing) on it. How to install and run it:
+[root README](../README.md#quick-start).
 
-It produces the paper's four products: **① finding** (which lever pays) · **② dataset** (the account) ·
-**③ method** (the counterfactual) · **④ instrument** (this reproducible package).
+## How it flows
 
-## Design principles
-1. **A layered pipeline of library-backed modules — not ad-hoc scripts, not agents.** Each step is a pure,
-   testable function; parameters live in `config/`, never hardcoded; the whole thing runs as one DAG.
-2. **Granularity is a contract, not a hope.** The GAT project died by forcing region data to a facility task.
-   Here every layer boundary is guarded by a **pandera** schema (`validation/schemas.py`): the atomic unit is
-   the **facility-month**; each resource keeps its native partition; the facility is the join key; you
-   aggregate UP, never down-force. Violations are test failures.
-3. **Reproducible by construction** (this is contribution ④): `snakemake -c4 all` rebuilds everything;
-   config-driven; open data + open code.
-
-## The accounting equation (L2) — from the lit review (Guidi/Harvard, Li "Thirsty", Siddik)
-Per facility *f*, month *m*, grid-zone *z(f)*, basin *b(f)*:
 ```
-E_IT    = capacity_MW · utilisation · hours(m)
-E_grid  = E_IT · PUE
-Carbon  = E_grid · CI(z, m)                       # CI = Ember grid carbon intensity
-W_onsite= WUE · E_IT                              # scope-1
-EWIF    = Σ_fuel share_fuel(z,m) · macknick[fuel] # scope-2 intensity (L/MWh)
-W_grid  = EWIF(z,m) · E_grid                       # scope-2
-W_phys  = W_onsite + W_grid                        # PHYSICAL litres — reported first
-W_scarce= W_phys · AWARE_CF(b, month)             # scarcity-weighted — SEPARATE column, never blended
+L0 ingest ─► L1 geo linkage ─► L2 account ─► L2.5 calibration
+                                   │
+          ┌────────────┬───────────┼─────────────┬──────────────┐
+          ▼            ▼           ▼             ▼              ▼
+     L3 forecast   L4 spatial   L5 legal    L7 levers,     L8 uncertainty
+     (Q3 input,    matrices     gap +       Q1 siting,
+      Q1 water                  legal       Q2 scorecard
+      scenarios)                effects
+          └────────────┴─────► L6 Q3 routing ◄┘
+                                   │
+                                   ▼
+                     L9 report + figures (results/)
 ```
-Levers (L7): a **lever = a parameter transform** (coastal→WUE↓; ZLD→W_onsite·(1−recycle), scope-1 only;
-efficiency→PUE/WUE cap, with the energy↑/water↓ trade-off), re-run the account, report Δ vs baseline → rank.
+The India runner is `pipeline.py` (14 stages); `regions.py` runs the same layers for the US and the EU.
 
-## Layers → modules → libraries
-| Layer (ARCHITECTURE v2) | Module | Libraries |
+## Layers and where they live
+
+All paths are under `src/dcfootprint/`.
+
+| Layer | What it does | Module |
 |---|---|---|
-| config | `config/parameters.yaml`, `datasets.yaml`, `legal_constraints.csv` | PyYAML |
-| L0 ingest | `io/` (facilities, ember, gem, cea [optional cross-check]) | pandas, pyarrow, openpyxl |
-| L1 geo linkage | `geo/join.py` (facility→AWARE basin), `geo/generation_basins.py` (GEM plant→basin, scope-2 CF) | geopandas, shapely, pyogrio |
-| **contracts** | `validation/schemas.py` | **pandera** |
-| L2 account | `account/` (energy, carbon = E_grid·CI(state,m), water, build, calibrate) | pandas, numpy |
-| L3 forecast + R̂ | `project/forecast.py` (rolling backtest), `project/recharge.py` (G3P season, basin budgets) | statsmodels |
-| L4 spatial coupling | `geo/incidence.py` (A_zone, A_basin — used by routing) | pandas |
-| L5 policy | `policy/gap.py` (matrix + constraint effects), `policy/rag_bridge.py` | pandas |
-| L6 routing (Q3) | `routing/lyapunov.py` (static · greedy · lyapunov · perfect-foresight · offline LP oracle) | scipy (HiGHS) |
-| L7 decisions | `counterfactual/levers.py` (ranked levers), `decisions/scorecard.py` (Q2), `decisions/siting.py` (Q1) | numpy |
-| L8 uncertainty | `uncertainty/monte_carlo.py` (per-type bands, first-order Sobol) | numpy |
-| L9 orchestration | `pipeline.py` (tested entrypoint), `workflow/Snakefile` (wrapper) | snakemake |
-| viz/maps | `viz/` | matplotlib, geopandas, folium |
+| **L0 ingest** | read facilities, Ember grid data, GEM plants, AWARE water | `io/facilities.py` (India), `io/us_facilities.py` (US), `io/ember.py`, `io/gem.py`, `io/aware.py` |
+| **L1 geo linkage** | put each facility in a water basin; put each power plant in a state and basin | `geo/join.py`, `geo/generation_basins.py` |
+| **L2 account** | energy, carbon, physical and scarcity-weighted water per facility-month | `account/build.py`, `account/energy.py`, `account/carbon.py`, `account/eu.py` (EU, country level) |
+| **L2.5 calibration** | compare totals with CEEW (India), LBNL (US), EU coverage | `account/calibrate.py` |
+| **L3 forecast** | grid carbon-intensity forecasts; the Q3 forecast method is chosen by a rule fixed in advance | `project/forecast.py`, `project/hierarchy.py` |
+| | water budgets per basin; Aqueduct 2030/2050 water-stress scores | `project/recharge.py`, `project/scarcity_future.py` |
+| **L4 spatial** | facility-to-zone and facility-to-basin matrices | `geo/incidence.py` |
+| **L5 legal** | 4-axis regulatory gap; legal rules as effects (bans, ZLD, PUE caps) | `policy/gap.py`, `policy/rag_bridge.py` |
+| **L6 Q3 routing** | shift flexible load between sites within water budgets | `routing/lyapunov.py`, `routing/agents.py` |
+| **L7 decisions** | lever savings; Q2 scorecard; Q1 siting | `counterfactual/levers.py`, `decisions/scorecard.py`, `decisions/siting.py` |
+| **L8 uncertainty** | Monte Carlo bands, first-order Sobol indices | `uncertainty/monte_carlo.py` |
+| **L9 outputs** | report and figures | `pipeline.py`, `regions.py`, `viz/figures.py` |
+| contracts | a data contract at every layer boundary | `validation/schemas.py` (pandera), `settings.py` (pydantic) |
 
-## Execution — one spine + parallel tracks (see `workflow/Snakefile`)
-```
-SPINE:   facilities → geo_join → account (L2) → levers (L7)  → finding
-TRACK A: load_ember + load_aware + macknick        (data; land before account)
-TRACK B: regulatory_gap (L5)                        (policy; land before counterfactual)
-TRACK C: forecast (L4, Ceiling)                     (independent; integrate after account)
-CROSS:   uncertainty (L6) after account;  release (L7)
-```
-`snakemake -c4 floor` = India-only Floor (submittable). `snakemake -c4 all` = full Ceiling.
+## The account (L2)
 
-## Repo layout
+For facility *f*, month *m*, grid zone *z* (Indian or US state, EU country) and water basin *b*:
 ```
-dcfootprint/
-  pyproject.toml          # dependencies (libraries per layer)
-  config/
-    parameters.yaml       # PUE, WUE, EWIF crosswalk, inference share, LEVERS — every assumption
-    datasets.yaml         # dataset registry: path · granularity · join_key · role (mirrors DATA.md D/E/F)
-  src/dcfootprint/
-    io/ geo/ account/ counterfactual/ forecast/ policy/ uncertainty/ validation/ viz/
-  workflow/Snakefile      # the DAG
-  tests/                  # pytest — schema + equation unit tests
-  outputs/                # (gitignored) account, savings, gap matrix, projections
+E_IT     = capacity_MW · utilisation · hours(m)             IT energy
+E_grid   = E_IT · PUE                                       grid energy
+Carbon   = E_grid · CI(z, m)                                Ember state-month carbon intensity
+W_onsite = WUE · E_IT                                       scope 1: cooling water
+W_grid   = EWIF(z, m) · E_grid                              scope 2: water used by the power plants
+W_phys   = W_onsite + W_grid                                physical litres (reported first)
+W_scarce = W_onsite · CF(b, m) + W_grid · CF_gen(z, m)      scarcity-weighted, separate column
 ```
+`CF` is the AWARE 2.0 monthly scarcity factor of the facility's basin; `CF_gen` is the capacity-weighted factor
+of the basins where the zone's power plants sit. A **lever** is a change to these parameters (for example ZLD
+recycles scope-1 water only); the account is re-run and compared with the baseline.
 
-## Build order & status
-- **Scaffolded now:** package structure, `pyproject.toml`, both configs, `validation/schemas.py` (the contracts),
-  `account/build.py` (the account equations, inline), `workflow/Snakefile` (the DAG).
-- **Next (in spine order):** `io/facilities.py` (merge our-list ⋈ ATLAS coords ⋈ CEA plant data — the L0 bottleneck)
-  → `geo/join.py` (zone + basin assignment) → `account/{energy,carbon}.py` → `counterfactual/levers.py`.
-  Parallel: `policy/gap.py`, `io/ember.py`, `io/aware.py`.
-- **Floor first:** India only, 1–2 levers → a complete paper; then extend to US/EU + all levers + forecast (Ceiling).
+## Configuration (`config/`)
 
-## The four granularity decisions locked into config (DATA.md §E3/F)
-US carbon = Ember-state (eGRID = cross-check) · EU = country-only (light) · India carbon = Ember-state
-generation-proxy (water carries India novelty) · scarcity = AWARE gpkg only (Aqueduct ≠ joinable key).
+Every number the pipeline assumes is in `config/`, never in code.
 
-## Data layout expected at the repo root (`data/`, gitignored)
-```
-data/ember/india_monthly_full_release_long_format.csv
-data/atlas/datacenters.parquet
-data/aware/AWARE20_Native_CFs_geospatial.gpkg
-data/g3p/G3P_v1.12_tws_rivbas.csv
-data/gem/Global-Integrated-Power-March-2026-II.xlsx      (India subset cached as parquet on first run)
-data/cea/CEA_Database_V22.xlsx                           (optional: cross-check only)
-data/gadm/gadm41_IND.gpkg, gadm41_USA.gpkg                  (GADM 4.1; layer ADM_ADM_1)
-data/ember/us_monthly_full_release_long_format.csv, europe_monthly_full_release_long_format.csv
-data/aware/AWARE20_Intermediate_Variables.xlsx, AWARE20_Countries_and_Regions.xlsx
-data/compute_atlas/facilities_v1.34.0.json                 (US spine; Compute Atlas release v1.34.0, CC BY 4.0)
-data/epoch/data_centers.csv                                (Epoch AI, optional cross-check)
-data/eu_eed/EU_DC_assessment_first_technical_report_2025-07.pdf  (source of config/eu_member_state_2023.csv)
-```
-The Co-RE forecast benchmark is read from `$DCF_GAT_DIR`, else `gat-based-forecasting/diff/gat-sarima-nexus`,
-else `../diff/gat-sarima-nexus`. Its "Nexus" rows are **Chronos-2 in the Nexus slot** and are reported under that label.
+| File | Holds |
+|---|---|
+| `parameters.yaml` | PUE, WUE, utilisation, water intensities per fuel, levers, routing, siting, uncertainty bands, per-region settings |
+| `datasets.yaml` | where each dataset lives, its granularity and join key |
+| `legal_constraints.csv` | each legal rule and its effect on Q1 and Q3 |
+| `policy_sources.csv` | the 15 policy documents of the legal corpus |
+| `eu_member_state_2023.csv` | EU per-country datacenter energy and water, rebuilt from the EED report by `experiments/extract_eu_tables.py` |
 
-## Regions
-`python -m dcfootprint.pipeline` runs India (facility tier). `python -m dcfootprint.regions US EU` runs
-the US (facility tier, Compute Atlas) and the EU (country tier, EED Member State aggregates for 2023);
-outputs go to `results/us/` and `results/eu/`. Q3 routing is not run for the EU (no site locations).
+## Outputs
+
+| Where | What |
+|---|---|
+| `results/RESULTS_FULL.md` | the full report of the latest India run (US, EU: `results/us/`, `results/eu/`) |
+| `results/india_account_summary.csv` | annual totals per facility |
+| `results/lever_savings.csv` | savings per lever |
+| `results/q1_siting.csv` | Q1 ranking; `_small_grids.csv` = grids under 10 TWh/yr, ranked apart; `_scenarios.csv` = 2030/2050 water scenarios |
+| `results/q2_scorecard.csv` | Q2 harm scorecard |
+| `results/routing_comparison.csv` | Q3 policies compared; `routing_budget_sweep.csv`, `routing_v_sweep.csv` = sensitivity |
+| `results/forecast_*.csv` | forecast backtests and the forecast used by Q3 |
+| `results/regulation_*.csv`, `policy_corpus.csv` | regulatory gap matrix and legal effects |
+| `results/uncertainty.json` | Monte Carlo bands and Sobol indices |
+| `results/figures/` | figures (US/EU maps in `results/us/figures/`, `results/eu/figures/`) |
+| `outputs/` (not in git) | the facility-month account as parquet, intermediate files |
+| `results/round3_final/` | **frozen canonical India snapshot** (tag `round3-final`); quote numbers from here |
+
+`results/` is overwritten by every run. Canonical snapshots are never edited; a new one gets a new folder.
+
+## Tests (`tests/`)
+
+| File | Covers |
+|---|---|
+| `test_price_decomposition.py` | the agent-based routing solver equals the central LP |
+| `test_contracts.py` | data contracts accept good data and reject bad data |
+| `test_us_eu.py` | US capacity classifier, EU extraction totals, Ember normalisation |
+| `test_forecast_metrics.py` | the 10 forecast metrics against hand-computed values |
+| `test_hierarchy_validity.py` | degenerate SARIMA fits are rejected |
+| `test_siting_scenarios.py` | Q1 scenario regret and the Aqueduct score contract |
+
+## Working rules
+
+1. Parameters are fixed from evidence (a citation, a data audit) **before** a run and never retuned because a
+   result looks wrong. A surprising result is investigated; only real bugs are fixed.
+2. Each change is its own commit, checked by comparing results before and after
+   (`experiments/compare_results.py`).
+3. Canonical snapshots are immutable.
+
+Other files: `ARCHITECTURE.md` (original design and the tiered contributions, section 7),
+`experiments/` (one-off checks and reports, [README](experiments/README.md)), `workflow/Snakefile` (wraps the runner).
