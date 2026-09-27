@@ -131,6 +131,7 @@ def run_region(region: str) -> dict:
     unc = stage(f"{region} L8 uncertainty", _unc)
 
     stage(f"{region} L9 report", lambda: _report(region, res, account, cal, lv, q2, q1, rt, unc))
+    stage(f"{region} L9 figures", lambda: __import__("dcfootprint.viz.figures", fromlist=["make_region"]).make_region(region, res))
     return {"status": status, "artifacts": art}
 
 
