@@ -1,10 +1,14 @@
-# Gate experiments (de-risking, run 2026-09-26)
+# experiments/
 
-Standalone first-pass tests on data in hand (results in ../ARCHITECTURE.md §6.5).
+Early gate experiments that de-risked the design before the pipeline was built.
 
-- `gates_1_2_calibration_coverage.py` — G1 calibration (bottom-up vs CEEW) + G2 coverage uniformity.
-- `gate3_rq2_scarcity_reranking.py` — G3: does scarcity-weighting re-rank basins/states beyond MC noise? (ANNUAL CF).
+## Early gate experiments (2026-09-26)
 
-**Result:** G1 PASS (1.39 GW vs 1.5-1.8) · G2 PLAUSIBLE (61% capacity in 3 sites) · G3 = scarcity does NOT re-rank annually (DCs already in stressed basins).
-**Pending:** seasonal (monthly-CF) version of G3; forecasting backtest.
-Paths point to repo-root `data/` + `context/data/`; needs pandas/geopandas/shapely/scipy.
+| Script | What it does |
+|---|---|
+| `gates_1_2_calibration_coverage.py` | G1: bottom-up India capacity vs CEEW (pass: 1.39 GW vs 1.5-1.8); G2: coverage (plausible) |
+| `gate3_rq2_scarcity_reranking.py` | G3: does annual scarcity weighting re-rank hotspots? No: datacenters already sit in stressed basins |
+
+The gate scripts predate the package and read from a hard-coded path (`R = ...` at the top); set it to your repository root before running them.
+
+The current set of experiments (including the forecasting run) is on [`feat/us-eu`](https://github.com/energyclimaterp-paper/counterfactual-policy/tree/feat/us-eu/dcfootprint/experiments).
