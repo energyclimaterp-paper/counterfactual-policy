@@ -10,6 +10,12 @@ and cached forecasts (read-only). Scored exactly like experiments/score_core_cac
     (as for the cached models), never estimated.
 Series whose tag is not "ollama" (a fallback fired) are reported and excluded from the LLM-Nexus scores.
 
+Repeats (column `rep`): LLM Nexus is not repeatable on GPU even at temperature 0 (two runs of the same
+3 basins differed by up to 88, also with parallelism and flash attention off), so each series is run
+several times. Pre-registered: the Nexus forecast is the per-month MEDIAN over repeats; each repeat
+is also scored alone, and the RMSE/MASE range across repeats and the forecast spread (max - min) are
+written to <label>_repeat_variability.csv. Files without `rep` are one repeat.
+
 The comparison table uses only the series that Nexus actually completed, for every model, so a
 partial run is still compared like for like.
 
@@ -50,13 +56,24 @@ def _records(fc: pd.DataFrame, dump: dict, model_col: str | None = None) -> pd.D
 def run(run_dir: Path, label: str, files: list[Path]) -> pd.DataFrame:
     dump = json.load(open(CORE / "work" / "region_series_dump.json"))
     nx = pd.concat([pd.read_csv(f, parse_dates=["timestamp"]) for f in files], ignore_index=True)
-    nx = nx.drop_duplicates(["resource", "region_id", "timestamp"])
-    complete = nx.groupby(["resource", "region_id"])["timestamp"].transform("size") == HOLDOUT
+    if "rep" not in nx.columns:
+        nx["rep"] = 1                                       # single-run files (before repeats existed)
+    nx = nx.drop_duplicates(["resource", "region_id", "rep", "timestamp"])
+    complete = nx.groupby(["resource", "region_id", "rep"])["timestamp"].transform("size") == HOLDOUT
     nx = nx[complete]
-    fell_back = nx[nx["tag"] != "ollama"][["resource", "region_id", "tag"]].drop_duplicates()
+    fell_back = nx[nx["tag"] != "ollama"][["resource", "region_id", "rep", "tag"]].drop_duplicates()
     if len(fell_back):
-        print(f"{len(fell_back)} series fell back (excluded from LLM-Nexus scores):\n{fell_back.to_string(index=False)}")
+        print(f"{len(fell_back)} series x repeat units fell back (excluded):\n{fell_back.to_string(index=False)}")
     nx = nx[nx["tag"] == "ollama"]
+    reps = nx.groupby(["resource", "region_id"])["rep"].nunique()
+    if reps.nunique() > 1:
+        print(f"unequal repeat counts per series (scored on what exists): {reps.value_counts().to_dict()}")
+    per_rep = nx.copy()
+    # the Nexus forecast = per-month MEDIAN over repeats (pre-registered: LLM Nexus is not repeatable on GPU)
+    nx = (nx.groupby(["resource", "region_id", "timestamp"], as_index=False)
+          .agg(value=("value", "median"), actual=("actual", "first"), seconds=("seconds", "sum"),
+               n_reps=("rep", "nunique"), spread=("value", lambda v: float(v.max() - v.min()))))
+    nx["tag"] = "ollama"
 
     # the runner's actuals must equal the dump's (same series, same holdout) -- stop if not
     for (res, rid), g in nx.groupby(["resource", "region_id"]):
@@ -89,6 +106,23 @@ def run(run_dir: Path, label: str, files: list[Path]) -> pd.DataFrame:
     tab = pd.DataFrame(rows).sort_values(["resource", "region", "RMSE"])
     tab.to_csv(m / f"{label}_vs_core_cached_per_region.csv", index=False)
     pd.DataFrame(zrows).to_csv(m / f"{label}_vs_core_cached_per_zone.csv", index=False)
+
+    # run-to-run variability: each repeat scored on its own, and the spread between repeats
+    d_rep = _records(per_rep.assign(model=[f"{label}__rep{int(k)}" for k in per_rep["rep"]]), dump, "model") \
+        if per_rep["rep"].nunique() > 1 else pd.DataFrame()
+    if len(d_rep):
+        rr = pd.DataFrame([{"resource": res, "region": reg, "model": mdl, **metrics(d)}
+                           for (mdl, res, reg), d in d_rep.groupby(["model", "resource", "region"])])
+        var = (rr.groupby(["resource", "region"])
+               .agg(n_repeats=("model", "nunique"), RMSE_min=("RMSE", "min"), RMSE_max=("RMSE", "max"),
+                    MASE_min=("MASE", "min"), MASE_max=("MASE", "max")).reset_index())
+        spread = nx.assign(region=[region_of(r, s) for r, s in zip(nx["region_id"], nx["resource"])]) \
+            .groupby(["resource", "region"])["spread"].agg(spread_median="median", spread_max="max").reset_index()
+        var = var.merge(spread, on=["resource", "region"])
+        var.to_csv(m / f"{label}_repeat_variability.csv", index=False)
+        rr.to_csv(m / f"{label}_per_repeat_per_region.csv", index=False)
+        print("run-to-run variability (each repeat scored alone; spread = max-min forecast across repeats):\n"
+              + var.round(3).to_string(index=False) + "\n")
     runtime = nx.groupby(["resource", "region_id"])["seconds"].first()
     print(f"\n{label}: {len(keys)} series scored ({nx.groupby('resource').region_id.nunique().to_dict()}); "
           f"median {runtime.median():.0f} s per series\n")
