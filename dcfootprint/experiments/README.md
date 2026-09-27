@@ -31,8 +31,21 @@ Run in this order:
 | `assemble_forecast_run.py` | writes the run's manifest, environment freezes, seeds and config snapshot |
 | `summarize_forecast_run.py` | writes `report/RUN_SUMMARY.md` from the metric files |
 
-The Co-RE cache's "Nexus" column is Chronos-2 in the Nexus slot and is labelled `chronos-2`; the real
-multi-agent Nexus has not been run.
+The Co-RE cache's "Nexus" column is Chronos-2 in the Nexus slot and is labelled `chronos-2`.
+
+## Fresh runs of every model (2026-09-28)
+
+All models run fresh on one grid, one set of windows and the 10 metrics, with prediction intervals.
+
+| Script | What it does |
+|---|---|
+| `forecast_run_core_grid.py` | seasonal naive, both SARIMAs, TimesFM 2.5, Chronos-2 and xLSTM (5 seeds): last-12 holdout + 3 rolling origins; writes forecasts, metrics, manifest and summary. Grid chosen by `SERIES_DUMP` (Co-RE grid by default); `score-nexus` adds the Kaggle Nexus results |
+| `export_dcf_grid_series.py` | writes the dcfootprint-grid series file (every Ember zone the pipeline reads + aggregates) |
+| `score_nexus_llm.py` | scores real (LLM) Nexus runs against the Co-RE cache, with the repeat-variability table |
+
+Runs: `runs/fresh_run_core_grid_2026-09-28/` (the grid Nexus runs on) and `runs/fresh_run_dcf_grid_2026-09-28/`.
+The real multi-agent Nexus runs on Kaggle (gemma4:26b); both scorers use the same rules for it (median over
+repeats, fallback series excluded).
 
 ## Early gate experiments (2026-09-26, historical)
 

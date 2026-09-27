@@ -1,0 +1,44 @@
+series: {'electricity': 118, 'carbon': 118} -> D:\3Gtech_paper - GNN\counterfactual-policy\runs\fresh_run_dcf_grid_2026-09-28
+  seasonal_naive  electricity: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+  seasonal_naive  carbon     : {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+  sarima_dcf      electricity: {('holdout', 'last12'): 93, ('rolling', '2022-12-01'): 93, ('rolling', '2023-12-01'): 94, ('rolling', '2024-12-01'): 59}  failures=94
+  sarima_dcf      carbon     : {('holdout', 'last12'): 117, ('rolling', '2022-12-01'): 114, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 80}  failures=5
+C:\Users\samik\AppData\Local\Programs\Python\Python311\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+  sarima_core     electricity: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+C:\Users\samik\AppData\Local\Programs\Python\Python311\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\samik\AppData\Local\Programs\Python\Python311\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\samik\AppData\Local\Programs\Python\Python311\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\samik\AppData\Local\Programs\Python\Python311\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+  sarima_core     carbon     : {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+  timesfm_2p5     electricity: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+  timesfm_2p5     carbon     : {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+Loading weights:   0%|          | 0/170 [00:00<?, ?it/s]Loading weights: 100%|██████████| 170/170 [00:00<00:00, 4059.69it/s]
+  chronos_2       electricity: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+  chronos_2       carbon     : {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+  xlstm           electricity seed 42: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 209s)
+  xlstm           carbon      seed 42: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 210s)
+  xlstm           electricity seed 43: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 213s)
+  xlstm           carbon      seed 43: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 211s)
+  xlstm           electricity seed 44: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 213s)
+  xlstm           carbon      seed 44: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 209s)
+  xlstm           electricity seed 45: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 209s)
+  xlstm           carbon      seed 45: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 208s)
+  xlstm           electricity seed 46: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 210s)
+  xlstm           carbon      seed 46: {('holdout', 'last12'): 118, ('rolling', '2022-12-01'): 117, ('rolling', '2023-12-01'): 117, ('rolling', '2024-12-01'): 81}  failures=0
+    (433 fits in 209s)
+DONE
