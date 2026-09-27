@@ -101,6 +101,7 @@ Nothing is merged into `main` yet; it will be after the round-4 canonical run.
 │   ├── architecture_diagram.png               # architecture diagram
 │   ├── architecture_diagram.svg               # architecture diagram (vector)
 │   ├── CFP_RECORD.md                          # the journal call for papers
+│   ├── COMMIT_HASH_MAP.md                     # old -> new commit hashes (history rewrite 2026-09-27)
 │   ├── DATA.md                                # every dataset: source, granularity, join key, what is on disk
 │   ├── GNN_AUTOPSY.md                         # why the earlier GNN approach was dropped
 │   ├── lit_review_coding_sheet.xlsx           # coded literature (84 papers)
