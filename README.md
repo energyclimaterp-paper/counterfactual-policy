@@ -17,6 +17,7 @@ research instrument behind a paper for the Elsevier *Energy and Climate Change* 
 | know why the project is shaped this way | [`context/00_PROJECT_STATE.md`](context/00_PROJECT_STATE.md) |
 | find your way around the code | [`dcfootprint/README.md`](dcfootprint/README.md) |
 | see the numbers | [`dcfootprint/results/round3_final/`](dcfootprint/results/round3_final/) (India, canonical) and `dcfootprint/results/RESULTS_FULL.md` (latest run) |
+| see the forecasting benchmark | [`runs/fresh_run_core_grid_2026-09-28/report/RUN_SUMMARY.md`](runs/fresh_run_core_grid_2026-09-28/report/RUN_SUMMARY.md) (every model, Co-RE grid) and [`runs/fresh_run_dcf_grid_2026-09-28/`](runs/fresh_run_dcf_grid_2026-09-28/) (pipeline zones) |
 | know where each dataset comes from | [`context/DATA.md`](context/DATA.md) |
 
 ## What it answers
@@ -120,7 +121,7 @@ Nothing is merged into `main` yet; it will be after the round-4 canonical run.
 │   │   └── architecture_flow.svg              # layer flow diagram
 │   ├── experiments/                           # scripts outside the pipeline (see its README)
 │   │   ├── README.md                          # what each script does
-│   │   └── *.py                               # 12 files
+│   │   └── *.py                               # 15 files
 │   ├── results/                               # outputs of the latest run (regenerated; not canonical)
 │   │   ├── round2_final/                      # FROZEN round-2 snapshot (do not edit)
 │   │   ├── round3_final/                      # FROZEN canonical India snapshot, tag round3-final (numbers to quote)
@@ -180,7 +181,9 @@ Nothing is merged into `main` yet; it will be after the round-4 canonical run.
 │   ├── pyproject.toml                         # dependencies
 │   └── README.md                              # package guide
 ├── runs/
-│   └── fresh_run_2026-09-27/                  # FROZEN forecasting run: 10 metrics, all models (report/RUN_SUMMARY.md)
+│   ├── fresh_run_2026-09-27/                  # FROZEN first forecasting run (fresh naive + SARIMA, rescored Co-RE cache)
+│   ├── fresh_run_core_grid_2026-09-28/        # every model fresh on the Co-RE grid; LLM Nexus to be added; see its README
+│   └── fresh_run_dcf_grid_2026-09-28/         # FROZEN: every model fresh on the pipeline's own Ember zones; see its README
 ├── .gitignore                                 # data/, outputs/ and caches are not versioned
 └── README.md                                  # this file
 ```
