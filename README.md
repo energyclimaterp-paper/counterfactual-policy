@@ -1,35 +1,76 @@
-# Counterfactual Policy Analysis of AI-Datacenter Carbon & Water — India / US / EU
+# Carbon and water footprint of AI datacenters: India, US, EU
 
-## What it does
-A deterministic pipeline — **account → project → counterfactual → policy-gap**:
-1. **Account** — a sub-national, facility-level, **joint carbon + scarcity-weighted-water** account of AI
-   datacenters, anchored on **India** (deep), with the **US** and **EU** for comparison.
-2. **Project** — forward projection (short-horizon grid-carbon-intensity forecast + growth scenario) to 2030.
-3. **Counterfactual** — what specific water/carbon **policy levers** would save (conditional scenarios).
-4. **Policy-gap** — a cross-jurisdiction, four-axis **regulatory-gap map** of where the measured burden
-   falls in regulatory blind spots.
+> **Branch `main`: design stage (2026-09-26).** It holds the research record, the architecture and an empty
+> package scaffold; the pipeline is **not** built here. **The working pipeline is on
+> [`feat/us-eu`](https://github.com/energyclimaterp-paper/counterfactual-policy/tree/feat/us-eu)**, where it runs end to end for India, the US and the EU.
 
-Contributions are **tiered by evidential strength** (Tier-1 robust spine · Tier-2 conditional reach) —
-see [`dcfootprint/ARCHITECTURE.md §7`](dcfootprint/ARCHITECTURE.md).
+The project builds an open, reproducible, facility-level **carbon and scarcity-weighted water** account of AI
+datacenters (India in depth, the US and the EU for comparison), and uses it to ask which policy levers would
+reduce the burden and where regulation has blind spots. It is the instrument behind a paper for the Elsevier
+*Energy and Climate Change* special issue "Computing and Digitalization through a Multi-Disciplinary Lens".
 
-## Repository layout
-| Path | What |
+## Start here
+
+| If you want to... | Read |
 |---|---|
-| `dcfootprint/` | the pipeline: package (`src/dcfootprint/`), config, Snakemake workflow, **ARCHITECTURE.md** (design + contributions + risk register) |
-| `context/` | research record: `00_PROJECT_STATE.md` (read first), `RESEARCH_GAPS.md`, `LIT_REVIEW_VERIFIED.md`, `DATA.md`, `POLICY_DEEP_DIVE.md`, `CFP_RECORD.md`, `GNN_AUTOPSY.md` |
-| `context/data/India_DC_Facilities_v0.xlsx` | the open India datacenter facility list (a contribution) |
+| the project in one page: direction, decisions, research questions | [`context/00_PROJECT_STATE.md`](context/00_PROJECT_STATE.md) |
+| the design and the tiered contributions | [`dcfootprint/ARCHITECTURE.md`](dcfootprint/ARCHITECTURE.md) (section 7) |
+| where each dataset comes from | [`context/DATA.md`](context/DATA.md) |
+| the gate experiments that tested the design | [`dcfootprint/experiments/README.md`](dcfootprint/experiments/README.md) |
+| the literature and the gaps | [`context/LIT_REVIEW_VERIFIED.md`](context/LIT_REVIEW_VERIFIED.md), [`context/RESEARCH_GAPS.md`](context/RESEARCH_GAPS.md) |
 
-## Data
-Datasets are **not versioned here** (≈600 MB; several files exceed GitHub limits). Every source, its
-granularity, join key, and retrieval path is documented in **[`context/DATA.md`](context/DATA.md)** — the
-pipeline retrieves them into `data/` (git-ignored).
+## Branches
 
-## Status
-Architecture designed, scaffolded, and red-teamed; data acquired + validated. **Empirical build pending**
-(next: the gate experiments in `dcfootprint/ARCHITECTURE.md §6.4`, then the facility-layer build).
+| Branch | What it adds | State |
+|---|---|---|
+| `feat/us-eu` | US and EU regions, forecasting run, SARIMA fit checks, Q1 2030/2050 scenarios, US/EU maps | **current** |
+| `feat/architecture-gaps` | price-decomposition routing, validation, figures, forecast feeding Q3 | earlier stage |
+| `fix/tier1-headline-numbers` | headline fixes; canonical India run (tag `round3-final`) | earlier stage |
+| `feat/pipeline-l0-l9` | first complete India pipeline, layers L0 to L9 | earlier stage |
+| **`main` (you are here)** | design, research record and empty package scaffold | superseded |
+| `claude/modest-euler-714bjp` | side branch off the scaffold: seasonal re-ranking experiment (gate 3b) | not merged |
 
-## Stack
-Python · pandas/geopandas · pandera (data contracts) · pint (units) · Snakemake (reproducible DAG) ·
-statsmodels/sktime (forecasting). Deterministic by design — not a multi-agent system.
+## File structure
 
-*Solo author. Reproducibility is a first-class goal of this work.*
+```
+├── context/                                   # research record (why the project looks the way it does)
+│   ├── data/
+│   │   ├── india_dc_facilities.psv            # same list, plain text
+│   │   └── India_DC_Facilities_v0.xlsx        # the open India datacenter list (194 rows) - a contribution
+│   ├── 00_PROJECT_STATE.md                    # READ FIRST: direction, locked decisions, RQs
+│   ├── ARCHITECTURE.md                        # original research architecture (stages S0-S11)
+│   ├── architecture_diagram.png               # architecture diagram
+│   ├── architecture_diagram.svg               # architecture diagram (vector)
+│   ├── CFP_RECORD.md                          # the journal call for papers
+│   ├── DATA.md                                # every dataset: source, granularity, join key, what is on disk
+│   ├── GNN_AUTOPSY.md                         # why the earlier GNN approach was dropped
+│   ├── lit_review_coding_sheet.xlsx           # coded literature (84 papers)
+│   ├── LIT_REVIEW_VERIFIED.md                 # verified literature review
+│   ├── POLICY_DEEP_DIVE.md                    # regulation across India / US / EU
+│   └── RESEARCH_GAPS.md                       # gap analysis behind the contributions
+├── dcfootprint/                               # the pipeline: Python package and its config
+│   ├── config/                                # every assumption lives here, never in code
+│   │   ├── datasets.yaml                      # dataset registry: path, granularity, join key, role
+│   │   └── parameters.yaml                    # every numeric assumption (PUE, WUE, water intensities, levers, ...)
+│   ├── docs/
+│   │   └── architecture_flow.svg              # layer flow diagram
+│   ├── experiments/                           # scripts outside the pipeline (see its README)
+│   │   ├── README.md                          # what each script does
+│   │   └── *.py                               # 2 files
+│   ├── src/
+│   │   └── dcfootprint/
+│   │       ├── account/                       # L2 account
+│   │       │   └── water.py                   # water equations
+│   │       └── validation/
+│   │           └── schemas.py                 # pandera data contracts
+│   ├── workflow/
+│   │   └── Snakefile                          # Snakemake workflow
+│   ├── .gitignore
+│   ├── ARCHITECTURE.md                        # design, contributions (section 7), risk register
+│   ├── pyproject.toml                         # dependencies
+│   └── README.md                              # package guide
+├── .gitignore                                 # data/, outputs/ and caches are not versioned
+└── README.md                                  # this file
+```
+
+Datasets are not in git; `context/DATA.md` lists every source and where it goes in `data/`.
