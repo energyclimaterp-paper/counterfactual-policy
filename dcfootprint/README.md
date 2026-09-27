@@ -1,99 +1,91 @@
-# dcfootprint — architecture & build plan
+# dcfootprint (branch `feat/architecture-gaps`)
 
-The reproducible **instrument** behind the paper: an open, sub-national, inference-attributed
-**joint carbon + scarcity-weighted-water account** of AI datacenters (India deep · US solid · EU light),
-and a **counterfactual policy engine** that quantifies what water/carbon policy levers would save.
-(Research direction & rationale: `../context/RESEARCH_GAPS.md`; data: `../context/DATA.md`.)
+The Python package behind the paper, as it stood on this branch (architecture gaps closed (India only)). The current, fully documented
+package guide is on [`feat/us-eu`](https://github.com/energyclimaterp-paper/counterfactual-policy/tree/feat/us-eu/dcfootprint).
 
-It produces the paper's four products: **① finding** (which lever pays) · **② dataset** (the account) ·
-**③ method** (the counterfactual) · **④ instrument** (this reproducible package).
+Run the India pipeline from the repository root: `PYTHONPATH=dcfootprint/src python -m dcfootprint.pipeline`.
+Every assumption is in `config/parameters.yaml`; outputs go to `results/`.
 
-## Design principles
-1. **A layered pipeline of library-backed modules — not ad-hoc scripts, not agents.** Each step is a pure,
-   testable function; parameters live in `config/`, never hardcoded; the whole thing runs as one DAG.
-2. **Granularity is a contract, not a hope.** The GAT project died by forcing region data to a facility task.
-   Here every layer boundary is guarded by a **pandera** schema (`validation/schemas.py`): the atomic unit is
-   the **facility-month**; each resource keeps its native partition; the facility is the join key; you
-   aggregate UP, never down-force. Violations are test failures.
-3. **Reproducible by construction** (this is contribution ④): `snakemake -c4 all` rebuilds everything;
-   config-driven; open data + open code.
+## Layers
 
-## The accounting equation (L2) — from the lit review (Guidi/Harvard, Li "Thirsty", Siddik)
-Per facility *f*, month *m*, grid-zone *z(f)*, basin *b(f)*:
+| Layer | What it does |
+|---|---|
+| L0 ingest | read facilities, grid data, power plants, water data (`io/`) |
+| L1 geo linkage | facility to water basin (`geo/join.py`) |
+| L2 account | energy, carbon, physical and scarcity-weighted water per facility-month (`account/`) |
+| L3 forecast | grid carbon-intensity forecasts; basin water budgets (`project/`) |
+| L4 spatial | facility-to-zone and facility-to-basin matrices (`geo/incidence.py`) |
+| L5 legal | regulatory gap matrix (`policy/`) |
+| L6 Q3 routing | shift flexible load between sites (`routing/`) |
+| L7 decisions | levers, Q2 scorecard, Q1 siting (`counterfactual/`, `decisions/`) |
+| L8 uncertainty | Monte Carlo bands (`uncertainty/`) |
+| L9 outputs | report (`pipeline.py`) |
+
+## Files
+
 ```
-E_IT    = capacity_MW · utilisation · hours(m)
-E_grid  = E_IT · PUE
-Carbon  = E_grid · CI(z, m)                       # CI = Ember grid carbon intensity
-W_onsite= WUE · E_IT                              # scope-1
-EWIF    = Σ_fuel share_fuel(z,m) · macknick[fuel] # scope-2 intensity (L/MWh)
-W_grid  = EWIF(z,m) · E_grid                       # scope-2
-W_phys  = W_onsite + W_grid                        # PHYSICAL litres — reported first
-W_scarce= W_phys · AWARE_CF(b, month)             # scarcity-weighted — SEPARATE column, never blended
+├── config/                                    # every assumption lives here, never in code
+│   ├── datasets.yaml                          # dataset registry: path, granularity, join key, role
+│   ├── legal_constraints.csv                  # legal rules and their effect on Q1/Q3 (bans, ZLD, PUE caps)
+│   ├── parameters.yaml                        # every numeric assumption (PUE, WUE, water intensities, levers, ...)
+│   └── policy_sources.csv                     # the 15-document policy corpus (legal RAG manifest)
+├── docs/
+│   └── architecture_flow.svg                  # layer flow diagram
+├── experiments/                               # scripts outside the pipeline (see its README)
+│   ├── README.md                              # what each script does
+│   └── *.py                                   # 6 files
+├── results/                                   # outputs of the latest run (regenerated; not canonical)
+│   ├── round2_final/                          # FROZEN round-2 snapshot (do not edit)
+│   ├── round3_final/                          # FROZEN canonical India snapshot, tag round3-final (numbers to quote)
+│   ├── RESULTS.md                             # short results summary
+│   ├── RESULTS_FULL.md                        # full results report (all layers)
+│   └── *.csv, *.json                          # 18 files
+├── src/
+│   └── dcfootprint/
+│       ├── account/                           # L2 account
+│       │   ├── build.py                       # facility-month carbon + water account
+│       │   ├── calibrate.py                   # L2.5 check vs CEEW (India) / LBNL (US)
+│       │   ├── carbon.py                      # carbon = grid energy x state-month CI
+│       │   └── energy.py                      # IT and grid energy
+│       ├── counterfactual/                    # L7 levers
+│       │   └── levers.py                      # ZLD, efficiency, coastal, disclosure: savings per lever
+│       ├── decisions/                         # L7 decisions
+│       │   ├── scorecard.py                   # Q2 harm scorecard per facility
+│       │   └── siting.py                      # Q1 siting: regions ranked by minimax regret
+│       ├── geo/                               # L1 geo linkage + L4 spatial
+│       │   ├── generation_basins.py           # power plant -> basin; scope-2 scarcity factor
+│       │   ├── incidence.py                   # L4 facility-zone / facility-basin matrices
+│       │   └── join.py                        # facility -> AWARE basin (basin_id = GPKG fid)
+│       ├── io/                                # L0 ingest
+│       │   ├── aware.py                       # AWARE 2.0 water remaining per basin-month
+│       │   ├── cea.py                         # CEA plant data (optional; file not on disk)
+│       │   ├── ember.py                       # Ember monthly generation and emissions
+│       │   ├── facilities.py                  # India facility list + coordinates
+│       │   └── gem.py                         # GEM power plants, GADM state of record
+│       ├── policy/                            # L5 legal
+│       │   ├── gap.py                         # 4-axis regulatory gap matrix
+│       │   └── rag_bridge.py                  # policy corpus manifest (live RAG not wired)
+│       ├── project/                           # L3 forecast + projections
+│       │   ├── forecast.py                    # national CI rolling backtest; Co-RE benchmark reader
+│       │   ├── hierarchy.py                   # one-step state CI for Q3; pre-registered method choice
+│       │   └── recharge.py                    # basin water budgets (AWARE) + G3P context
+│       ├── routing/                           # L6 Q3 routing
+│       │   ├── agents.py                      # price decomposition solver (grid, basin, facility agents)
+│       │   └── lyapunov.py                    # static / greedy / Lyapunov / LP oracle policies
+│       ├── uncertainty/                       # L8
+│       │   └── monte_carlo.py                 # Monte Carlo bands + first-order Sobol
+│       ├── validation/
+│       │   └── schemas.py                     # pandera data contracts
+│       ├── viz/                               # L9
+│       │   └── figures.py                     # figures and maps
+│       ├── pipeline.py                        # RUN INDIA: all layers L0-L9, writes results/
+│       └── settings.py                        # loads + validates parameters.yaml (pydantic)
+├── tests/                                     # pytest suite
+│   └── test_*.py                              # 2 files
+├── workflow/
+│   └── Snakefile                              # Snakemake workflow
+├── .gitignore
+├── ARCHITECTURE.md                            # design, contributions (section 7), risk register
+├── pyproject.toml                             # dependencies
+└── README.md                                  # this file
 ```
-Levers (L7): a **lever = a parameter transform** (coastal→WUE↓; ZLD→W_onsite·(1−recycle), scope-1 only;
-efficiency→PUE/WUE cap, with the energy↑/water↓ trade-off), re-run the account, report Δ vs baseline → rank.
-
-## Layers → modules → libraries
-| Layer (ARCHITECTURE v2) | Module | Libraries |
-|---|---|---|
-| config | `config/parameters.yaml`, `datasets.yaml`, `legal_constraints.csv` | PyYAML |
-| L0 ingest | `io/` (facilities, ember, gem, cea [optional cross-check]) | pandas, pyarrow, openpyxl |
-| L1 geo linkage | `geo/join.py` (facility→AWARE basin), `geo/generation_basins.py` (GEM plant→basin, scope-2 CF) | geopandas, shapely, pyogrio |
-| **contracts** | `validation/schemas.py` | **pandera** |
-| L2 account | `account/` (energy, carbon = E_grid·CI(state,m), water, build, calibrate) | pandas, numpy |
-| L3 forecast + R̂ | `project/forecast.py` (rolling backtest), `project/recharge.py` (G3P season, basin budgets) | statsmodels |
-| L4 spatial coupling | `geo/incidence.py` (A_zone, A_basin — used by routing) | pandas |
-| L5 policy | `policy/gap.py` (matrix + constraint effects), `policy/rag_bridge.py` | pandas |
-| L6 routing (Q3) | `routing/lyapunov.py` (static · greedy · lyapunov · perfect-foresight · offline LP oracle) | scipy (HiGHS) |
-| L7 decisions | `counterfactual/levers.py` (ranked levers), `decisions/scorecard.py` (Q2), `decisions/siting.py` (Q1) | numpy |
-| L8 uncertainty | `uncertainty/monte_carlo.py` (per-type bands, first-order Sobol) | numpy |
-| L9 orchestration | `pipeline.py` (tested entrypoint), `workflow/Snakefile` (wrapper) | snakemake |
-| viz/maps | `viz/` | matplotlib, geopandas, folium |
-
-## Execution — one spine + parallel tracks (see `workflow/Snakefile`)
-```
-SPINE:   facilities → geo_join → account (L2) → levers (L7)  → finding
-TRACK A: load_ember + load_aware + macknick        (data; land before account)
-TRACK B: regulatory_gap (L5)                        (policy; land before counterfactual)
-TRACK C: forecast (L4, Ceiling)                     (independent; integrate after account)
-CROSS:   uncertainty (L6) after account;  release (L7)
-```
-`snakemake -c4 floor` = India-only Floor (submittable). `snakemake -c4 all` = full Ceiling.
-
-## Repo layout
-```
-dcfootprint/
-  pyproject.toml          # dependencies (libraries per layer)
-  config/
-    parameters.yaml       # PUE, WUE, EWIF crosswalk, inference share, LEVERS — every assumption
-    datasets.yaml         # dataset registry: path · granularity · join_key · role (mirrors DATA.md D/E/F)
-  src/dcfootprint/
-    io/ geo/ account/ counterfactual/ forecast/ policy/ uncertainty/ validation/ viz/
-  workflow/Snakefile      # the DAG
-  tests/                  # pytest — schema + equation unit tests
-  outputs/                # (gitignored) account, savings, gap matrix, projections
-```
-
-## Build order & status
-- **Scaffolded now:** package structure, `pyproject.toml`, both configs, `validation/schemas.py` (the contracts),
-  `account/build.py` (the account equations, inline), `workflow/Snakefile` (the DAG).
-- **Next (in spine order):** `io/facilities.py` (merge our-list ⋈ ATLAS coords ⋈ CEA plant data — the L0 bottleneck)
-  → `geo/join.py` (zone + basin assignment) → `account/{energy,carbon}.py` → `counterfactual/levers.py`.
-  Parallel: `policy/gap.py`, `io/ember.py`, `io/aware.py`.
-- **Floor first:** India only, 1–2 levers → a complete paper; then extend to US/EU + all levers + forecast (Ceiling).
-
-## The four granularity decisions locked into config (DATA.md §E3/F)
-US carbon = Ember-state (eGRID = cross-check) · EU = country-only (light) · India carbon = Ember-state
-generation-proxy (water carries India novelty) · scarcity = AWARE gpkg only (Aqueduct ≠ joinable key).
-
-## Data layout expected at the repo root (`data/`, gitignored)
-```
-data/ember/india_monthly_full_release_long_format.csv
-data/atlas/datacenters.parquet
-data/aware/AWARE20_Native_CFs_geospatial.gpkg
-data/g3p/G3P_v1.12_tws_rivbas.csv
-data/gem/Global-Integrated-Power-March-2026-II.xlsx      (India subset cached as parquet on first run)
-data/cea/CEA_Database_V22.xlsx                           (optional: cross-check only)
-```
-The Co-RE forecast benchmark is read from `$DCF_GAT_DIR`, else `gat-based-forecasting/diff/gat-sarima-nexus`,
-else `../diff/gat-sarima-nexus`. Its "Nexus" rows are **Chronos-2 in the Nexus slot** and are reported under that label.
