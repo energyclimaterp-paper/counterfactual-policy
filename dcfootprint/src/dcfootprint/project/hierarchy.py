@@ -42,19 +42,31 @@ def _panel(raw: pd.DataFrame) -> dict[str, pd.DataFrame]:
             "generation": wide("Electricity generation", "Total Generation", "GWh")}
 
 
+MAXITER = 500      # L-BFGS budget; a fit not converged by then is a failed fit (same rule as experiments/forecast_run.py)
+
+
 def _sarima_onestep(y: pd.Series, fit_end: pd.Timestamp, pred_start: pd.Timestamp, pred_end: pd.Timestamp):
-    """One-step predictions over [pred_start, pred_end] with parameters fitted on y[:fit_end]."""
+    """One-step predictions over [pred_start, pred_end] with parameters fitted on y[:fit_end].
+    Raises on an invalid fit; the caller then falls back to seasonal naive."""
     from statsmodels.tsa.statespace.sarimax import SARIMAX
     # stationarity/invertibility ENFORCED (statsmodels defaults): unconstrained fits produced
     # explosive roots and one-step forecasts up to 1e88 on 2019-2022 data
     kw = dict(order=(1, 1, 1), seasonal_order=(1, 0, 1, 12))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = SARIMAX(y[:fit_end], **kw).fit(disp=False)
+        res = SARIMAX(y[:fit_end], **kw).fit(disp=False, maxiter=MAXITER)
         full = res.apply(y[:pred_end], refit=False)
-        pred = full.get_prediction(start=pred_start, end=pred_end, dynamic=False).predicted_mean.values
+        p = full.get_prediction(start=pred_start, end=pred_end, dynamic=False)
+        pred, se = p.predicted_mean.values, p.se_mean.values
+    # validity checks ported from the forecasting run: a "converged" fit with every coefficient
+    # at +-1 and log-likelihood 0 forecast exactly 0 GWh for US New York generation (2022) and Texas
+    if not res.mle_retvals.get("converged", False):
+        raise RuntimeError(f"MLE did not converge in {MAXITER} iterations")
+    coefs = res.params.drop("sigma2", errors="ignore").to_numpy(float)
+    if np.any(np.abs(coefs) >= 0.9999) or not np.all(np.isfinite(se)):
+        raise RuntimeError("degenerate fit (coefficient on the unit boundary or non-finite SE)")
     if not np.all(np.isfinite(pred)) or np.nanmax(np.abs(pred)) > 10 * max(float(np.nanmax(np.abs(y[:fit_end]))), 1e-9):
-        raise FloatingPointError("SARIMA forecast diverged")      # caller falls back to seasonal naive
+        raise FloatingPointError("SARIMA forecast diverged")
     return pred
 
 
@@ -71,21 +83,23 @@ def _choose_and_forecast(y: pd.Series, year: int) -> dict:
     f0, f1 = pd.Timestamp(year, 1, 1), pd.Timestamp(year, 12, 1)
     truth_b = y[b0:b1].values
     err = {"seasonal_naive": _snaive_onestep(y, b0, b1) - truth_b}
+    sarima_fail = None
     if y[:b0].std() > 0:
         try:
             err["SARIMA"] = _sarima_onestep(y, b0 - pd.offsets.MonthBegin(1), b0, b1) - truth_b
-        except Exception:
-            pass                                                  # SARIMA not eligible for this series
+        except Exception as e:                                    # SARIMA not eligible for this series
+            sarima_fail = f"selection: {type(e).__name__}: {e}"
     rmse = {k: float(np.sqrt(np.nanmean(v ** 2))) for k, v in err.items()}
     model = min(rmse, key=rmse.get)
     if model == "SARIMA":
         try:
             pred = _sarima_onestep(y, f0 - pd.offsets.MonthBegin(1), f0, f1)
-        except Exception:                                         # diverged/failed in the forecast year
+        except Exception as e:                                    # diverged/failed in the forecast year
             model, pred = "seasonal_naive(sarima_failed)", _snaive_onestep(y, f0, f1)
+            sarima_fail = f"forecast: {type(e).__name__}: {e}"
     else:
         pred = _snaive_onestep(y, f0, f1)
-    return {"model": model, "backtest_rmse": rmse, "pred": np.maximum(pred, 0.0),
+    return {"model": model, "backtest_rmse": rmse, "pred": np.maximum(pred, 0.0), "sarima_fail": sarima_fail,
             "err_var": float(np.nanmean(err["SARIMA" if model == "SARIMA" else "seasonal_naive"] ** 2))}
 
 
@@ -119,7 +133,7 @@ def onestep_ci(year: int, zone: str = "state", method: str = "bottom_up", region
             fc[v][series], var[v][series] = r["pred"], r["err_var"]
             diag.append({"series": series, "variable": v, "model": r["model"],
                          "rmse_snaive": r["backtest_rmse"]["seasonal_naive"],
-                         "rmse_sarima": r["backtest_rmse"].get("SARIMA")})
+                         "rmse_sarima": r["backtest_rmse"].get("SARIMA"), "sarima_fail": r["sarima_fail"]})
     rows = []
     for t in range(12):
         rec = {}
@@ -168,7 +182,7 @@ def backtest_methods(zones, account_year: int, zone: str = "state", region: str 
     return tab, chosen
 
 
-CACHE_VERSION = "v2-stationary"      # bump when the forecasting code changes
+CACHE_VERSION = "v3-validfit"        # bump when the forecasting code changes
 
 
 def _cache_dir():
