@@ -44,6 +44,13 @@
   5. Karnataka basin 48907: CF 33.8, CI 396 g/kWh, 4 overdraft months, rank band 17-44
 - Excluded small grids (32 cells, q1_siting_small_grids.csv): own-generation CI (e.g. Mizoram 25 g/kWh) is not what a new load would draw; reported, not recommended.
 
+- **2030/2050 water scenarios** (q1_siting_scenarios.csv): minimax regret over weights x 7 Aqueduct 4.0 scenarios (baseline, bau/opt/pes x 2030/2050; 0-5 scores as a fifth criterion; carbon held at the account year). 117 cells scored, 0 without a score; 4 of the headline top 5 stay in the scenario top 5:
+  1. Karnataka basin 48720 (headline #2): Aqueduct score 2.30 now -> 2.27 bau 2050 (pes 2050 2.24); worst case in opt50
+  2. Karnataka basin 48334 (headline #3): Aqueduct score 1.41 now -> 1.39 bau 2050 (pes 2050 1.37); worst case in opt50
+  3. Karnataka basin 48527 (headline #4): Aqueduct score 2.61 now -> 2.58 bau 2050 (pes 2050 2.54); worst case in opt50
+  4. Karnataka basin 48907 (headline #5): Aqueduct score 2.30 now -> 2.27 bau 2050 (pes 2050 2.24); worst case in opt50
+  5. Karnataka basin 49090 (headline #6): Aqueduct score 2.30 now -> 2.27 bau 2050 (pes 2050 2.24); worst case in opt50
+
 ## L8 Uncertainty
 - scarcity-weighted water 90% interval (triangular draws, mode = point estimate): 573,454,537 - 1,074,254,628 m3-eq/yr; MC mean = 0.954x the point estimate (WUE band 0.7-2.5 L/kWh, mode 1.9).
 - first-order Sobol: {'util_colocation': 0.646, 'wue': 0.204, 'pue_colocation': 0.057, 'hydro': 0.053, 'ewif': 0.047, 'inference': 0.019}.

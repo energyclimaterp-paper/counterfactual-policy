@@ -1,6 +1,7 @@
 {
   "n_samples": 4000,
   "distribution": "triangular",
+  "measured_energy_and_water": false,
   "point_scarcity_m3eq_yr": 846601694.0,
   "facility_types": {
     "colocation": 71
