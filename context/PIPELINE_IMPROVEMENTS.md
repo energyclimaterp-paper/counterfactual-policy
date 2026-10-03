@@ -19,9 +19,15 @@ Branch `feat/us-eu`. Ranked by value to the Q1 journal paper. Each "why" ties to
 
 2. **Harden Q3 routing's synthetic demand + 30% flexible-share assumption.**
    - *Why:* the most attackable empirical assumption in the pipeline.
-   - *Do:* cite a source for the flexible-share instead of asserting 30%; lead with the existing sweeps
-     (`routing_v_sweep`, `routing_budget_sweep`) so the result is a bound across assumptions, not a point claim.
-   - *Effort:* low-medium.
+   - *Do:* lead with the existing sweeps (`routing_v_sweep`, `routing_budget_sweep`) so the result is a bound
+     across assumptions, not a point claim; cite the flexible-share rather than assert 30%.
+   - **Citations ready (from `LIT_REVIEW_VERIFIED.md`):** #59 Norris et al. (Duke) "Integrating Large Flexible
+     Loads" (2025); #60 Senga/Wang/Knittel (MIT) "Flexible Data Centers…" (iScience 2026); Google CICP (Virtual
+     Capacity Curves for time-flexible load); the "Emerald Conductor" field demo (arXiv 2507.00909, "DC load is
+     demonstrably flexible"). → flexibility is real and substantial; the exact shiftable fraction is
+     workload-dependent (batch/training » interactive), so keep the **sweep** as the headline and report 30% as a
+     central case, not a hard number.
+   - *Effort:* low-medium (the citing/framing is done; the code change is the coauthor's on the routing core).
 
 3. **India consumption-based carbon (Electricity Maps / EnergyMap).**
    - *Why:* removes the standing R2 generation-vs-consumption caveat; sharpens the India numbers.
@@ -41,9 +47,11 @@ Branch `feat/us-eu`. Ranked by value to the Q1 journal paper. Each "why" ties to
      **Not expanded** (a retrieval+LLM system for a 12-cell map = the Co-RE over-engineering trap). A scoped
      EU/US-perimeter audit + gold eval remains possible later if we want it, but is not required for the paper.
 
-5. **CGWB groundwater into the Q2 harm / equity view.**
-   - *Why:* the one missing dataset that adds a *contribution* (distributional/equity angle), not just coverage.
-   - *Effort:* medium (data).
+5. **CGWB groundwater into the Q2 harm / equity view.**  ✅ **DONE (2026-10-03)**
+   - `decisions/equity.py` overlays each facility's scarcity-water burden on the local CGWB groundwater stage of
+     extraction (city/district else state). **Finding: 63% of India's DC scarcity-water burden lands on
+     over-exploited aquifers (>100%), 81% on semi-critical-or-worse** (Bengaluru 187%, Chennai 125%). Standalone
+     from the canonical account, no re-run. Exhibit: `results/q2_equity_groundwater.{md,csv}`. (C7 contribution.)
 
 6. **Round-4 canonical run (India + US + EU).**
    - *Why:* reproducibility housekeeping; acceptance-critical for an "open, reproducible" paper.
