@@ -124,8 +124,10 @@ def build_registry() -> pd.DataFrame:
         fname = _CONSTRAINT_TO_CORPUS.get(str(r["region"]))
         cid = fname.replace(".pdf", "") if fname else None
         if cid and cid in corp.index:
-            corp.loc[cid, ["type", "rule", "effect", "param", "region"]] = [
-                r["type"], r["rule"], r.get("effect", ""), r.get("param", ""), r["region"]]
+            # carry the rule's citation too: corpus rows have no `source`, so without it 5 of the 7
+            # binding rules lost their evidence link in HARD_CONSTRAINTS / regulation_constraints.csv
+            corp.loc[cid, ["type", "rule", "effect", "param", "region", "source"]] = [
+                r["type"], r["rule"], r.get("effect", ""), r.get("param", ""), r["region"], r["source"]]
         else:
             standalone.append(dict(id=f"constraint_{r['region']}".lower().replace(' ', '_'),
                                    instrument=r["rule"], jurisdiction=r["jurisdiction"], region=r["region"],
