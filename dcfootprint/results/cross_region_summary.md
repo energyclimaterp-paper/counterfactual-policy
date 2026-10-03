@@ -53,8 +53,11 @@ volumetric water, grid-access/rate, and entity disclosure — none of our four a
 facilities as harmful (top-quartile scarcity water in high-stress basins).
 
 ## Supporting finding — forecasting (not a contribution)
-Simple ≥ complex across 66 series × 3 regions: the deep net (xLSTM) is worst, classical/hierarchical SARIMA and
-seasonal-naive win or tie, no model meaningfully beats naive (MASE 0.79–1.0). See `forecast_simple_vs_complex.md`.
+Complexity does not pay across 66 account-zone series × 3 regions: the deep net (xLSTM) is the worst model in every
+window. Carbon intensity, the quantity the account uses, is best forecast by a classical per-zone SARIMA (about 11%
+below seasonal naive on both the rolling and the holdout windows); for electricity the foundation models beat
+seasonal naive on the rolling windows (12–14%) but not on the single holdout. The hierarchical bottom-up / MinT
+methods (Q3, one step ahead) give no robust gain. See `forecast_simple_vs_complex.md`.
 The resource/geography coupling lives in the account + optimization, not a joint/graph forecaster. GNN dropped (null).
 
 ## The paper's spine, in one line

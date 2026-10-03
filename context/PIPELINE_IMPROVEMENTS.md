@@ -15,6 +15,10 @@ Branch `feat/us-eu`. Ranked by value to the Q1 journal paper. Each "why" ties to
      evidence already exists in the fresh forecasting run (seasonal-naive vs SARIMA vs Co-RE models, simple wins).
    - *Do:* name **MinT / bottom-up reconciliation as the non-DL hierarchical baseline** R2 explicitly asked for
      (already computed — needs naming); emit one clean comparison table as a pipeline output.
+   - *Done (2026-10-04):* `dcfootprint/experiments/forecast_exhibit.py` -> `results/forecast_simple_vs_complex.{md,csv}`
+     + `forecast_hierarchical_onestep.csv`. Correction to the first version: `sarima_dcf` in the fresh run is a
+     per-zone SARIMA, not bottom-up/MinT; the hierarchical methods are the one-step Q3 backtest (`project/hierarchy.py`),
+     shown in their own table. Both windows reported; models compared with seasonal naive on the same points.
    - *Effort:* low (framing + one artifact).
 
 2. **Harden Q3 routing's synthetic demand + 30% flexible-share assumption.**

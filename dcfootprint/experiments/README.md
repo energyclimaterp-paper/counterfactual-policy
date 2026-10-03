@@ -41,6 +41,7 @@ All models run fresh on one grid, one set of windows and the 10 metrics, with pr
 |---|---|
 | `forecast_run_core_grid.py` | seasonal naive, both SARIMAs, TimesFM 2.5, Chronos-2 and xLSTM (5 seeds): last-12 holdout + 3 rolling origins; writes forecasts, metrics, manifest and summary. Grid chosen by `SERIES_DUMP` (Co-RE grid by default); `score-nexus` adds the Kaggle Nexus results |
 | `export_dcf_grid_series.py` | writes the dcfootprint-grid series file (every Ember zone the pipeline reads + aggregates) |
+| `forecast_exhibit.py` | builds `results/forecast_simple_vs_complex.{md,csv}` (does complexity pay?) from the Co-RE-grid run: both windows, paired skill vs seasonal naive, plus the one-step hierarchical (bottom-up / MinT) table |
 | `score_nexus_llm.py` | scores real (LLM) Nexus runs against the Co-RE cache, with the repeat-variability table |
 
 Runs: `runs/fresh_run_core_grid_2026-09-28/` (the grid Nexus runs on) and `runs/fresh_run_dcf_grid_2026-09-28/`.
