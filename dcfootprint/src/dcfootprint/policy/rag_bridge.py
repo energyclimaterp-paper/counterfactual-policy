@@ -1,14 +1,11 @@
-"""L5 bridge to the external legal-RAG project (default C:/Users/gauri/Projects/rag).
+"""L5 — bridge to the external legal-RAG project (default C:/Users/gauri/Projects/rag).
 
-That project is a LangGraph RAG (hybrid dense bge-m3 + BM25 + RRF + cross-encoder
-rerank; Ollama/Claude answers with inline citations and IN FORCE / PROPOSED / DRAFT /
-REVOKED status) over 15 real policy PDFs. We integrate its **frozen, human-verified
-corpus manifest** (`sources.csv`) as the citation/evidence base for the four-axis gap
-matrix. The retrieval + LLM steps run in the RAG's own venv (they need Ollama or an
-API key) and are NOT invoked by the pipeline — `answer_live()` is an optional hook.
-
-The manifest is copied into `config/policy_sources.csv` so dcfootprint stays
-self-contained and reproducible; point `DCF_RAG_DIR` at the live project to refresh it.
+The policy corpus now lives in the single registry (`policy/registry.py`, built from
+`config/policy_sources.csv`); this module exposes the corpus view + the optional live-RAG
+hook. The external project is a LangGraph RAG (hybrid dense bge-m3 + BM25 + RRF +
+cross-encoder rerank; Ollama/Claude answers with inline citations and IN FORCE / PROPOSED /
+DRAFT / REVOKED status) over 15 real policy PDFs. Its retrieval + LLM steps run in its own
+venv (Ollama or an API key) and are NOT invoked by the pipeline — `answer_live()` is optional.
 """
 from __future__ import annotations
 
@@ -18,57 +15,41 @@ from pathlib import Path
 
 import pandas as pd
 
-from dcfootprint.io.facilities import _repo_root
+from dcfootprint.policy.registry import load_registry
 
 RAG_DIR = Path(os.environ.get("DCF_RAG_DIR", r"C:/Users/gauri/Projects/rag"))
 
-# RAG corpus topic -> the four-axis the instrument is NEAREST to. None of the docs
-# actually mandate our four axes (that is the gap); this only labels the closest ones.
-_TOPIC_AXIS = {
-    "carbon_intensity": "carbon_intensity",
-    "electricity_consumption": "carbon_intensity",     # PUE / rate / grid-connection
-    "water_stress": "scarcity_weighted_water",
-    "water_storage": "scarcity_weighted_water",
-    "temperature": None,                                # cooling — no axis
-    "datacenter_mapping": None,
-    "siting_general": "scarcity_weighted_water",
-}
-
 
 def load_manifest() -> pd.DataFrame:
-    """The cited, status-flagged policy corpus (local copy first, else the live RAG)."""
-    local = _repo_root() / "dcfootprint" / "config" / "policy_sources.csv"
-    path = local if local.exists() else RAG_DIR / "sources.csv"
-    df = pd.read_csv(path)
-    df["in_force"] = df["status"].astype(str).str.upper().str.startswith("IN FORCE")
-    df["axis_nearest"] = df["topic"].map(_TOPIC_AXIS)
-    return df
+    """The corpus view of the registry (the 15 cited, status-flagged policy documents)."""
+    reg = load_registry()
+    return reg[reg["in_corpus"]].copy()
 
 
 def cited_constraints() -> pd.DataFrame:
-    """In-force instruments that actually bite (siting / efficiency / water), cited."""
-    df = load_manifest()
-    keep = df[df["in_force"]].copy()
-    return keep[["jurisdiction", "title", "doc_type", "topic", "status", "url"]].reset_index(drop=True)
+    """In-force corpus instruments, cited (the regulated perimeter that actually bites)."""
+    corp = load_manifest()
+    keep = corp[corp["in_force"]].copy().rename(columns={"instrument": "title"})
+    return keep[["jurisdiction", "region", "title", "doc_type", "topic", "status", "url"]].reset_index(drop=True)
 
 
 def corpus_summary() -> dict:
-    df = load_manifest()
+    corp = load_manifest()
     return {
-        "n_documents": int(len(df)),
-        "n_in_force": int(df["in_force"].sum()),
-        "n_proposed_or_draft": int((~df["in_force"]).sum()),
-        "jurisdictions": sorted(df["jurisdiction"].unique().tolist()),
-        "topics": sorted(df["topic"].unique().tolist()),
+        "n_documents": int(len(corp)),
+        "n_in_force": int(corp["in_force"].sum()),
+        "n_proposed_or_draft": int((~corp["in_force"]).sum()),
+        "jurisdictions": sorted(corp["region"].astype(str).unique().tolist()),   # fine-grained (region)
+        "topics": sorted(corp["topic"].astype(str).unique().tolist()),
         "axes_directly_mandated": 0,     # corpus is the regulated *perimeter* — confirms the 4-axis gap
-        "source": "external legal-RAG corpus (sources.csv), human-verified + status-flagged",
+        "source": "policy registry (config/policy_sources.csv), human-verified + status-flagged",
     }
 
 
 def answer_live(question: str, timeout: int = 300) -> str | None:
     """OPTIONAL: run the external RAG in its own venv to (re)generate a cited answer.
-    Needs Ollama running or ANTHROPIC_API_KEY. Not called by the pipeline; returns
-    None if the venv/entrypoint isn't available."""
+    Needs Ollama running or ANTHROPIC_API_KEY. Not called by the pipeline; returns None
+    if the venv/entrypoint isn't available."""
     py = RAG_DIR / "venv" / "Scripts" / "python.exe"
     if not (py.exists() and (RAG_DIR / "ask.py").exists()):
         return None

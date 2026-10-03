@@ -101,8 +101,9 @@ def run() -> dict:
     # --- L5 policy-gap ---
     def _policy():
         from dcfootprint.policy import gap, rag_bridge
-        gap.four_axis_matrix().to_csv(RES / "regulation_matrix.csv", index=False)
-        gap.HARD_CONSTRAINTS.to_csv(RES / "regulation_constraints.csv", index=False)
+        gap.registry().to_csv(RES / "policy_registry.csv", index=False)      # the single source
+        gap.four_axis_matrix().to_csv(RES / "regulation_matrix.csv", index=False)   # derived
+        gap.HARD_CONSTRAINTS.to_csv(RES / "regulation_constraints.csv", index=False)  # binding view
         ov = gap.gap_overlay(account)
         try:                                        # attach the RAG corpus as cited evidence
             rag_bridge.load_manifest().to_csv(RES / "policy_corpus.csv", index=False)
