@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 582" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto">
+      <path d="M0,0 L6.5,3 L0,6 Z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1000" height="582" fill="#fcfcfb"/>
+
+  <text x="500" y="26" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">dcfootprint — architecture (v2)</text>
+  <text x="500" y="46" text-anchor="middle" font-size="12" fill="#4b5563">an open, reproducible account → three decisions · India (deep) · US · EU · deterministic</text>
+
+  <!-- CONFIG -->
+  <rect x="30" y="60" width="940" height="28" rx="6" fill="#f1ebe0" stroke="#b08d57" stroke-width="1.2"/>
+  <text x="500" y="78" text-anchor="middle" font-size="11.5" fill="#1f2937"><tspan font-weight="700">CONFIG</tspan>  ·  parameters.yaml · datasets.yaml · legal_constraints.csv · policy_sources.csv   (pydantic-validated · pandera contracts at every boundary)</text>
+
+  <!-- L0 -->
+  <rect x="30" y="100" width="940" height="42" rx="7" fill="#eef2f7" stroke="#475569" stroke-width="1.2"/>
+  <text x="48" y="118" font-size="12.5" fill="#111827"><tspan font-weight="700">L0  INGEST</tspan></text>
+  <text x="48" y="134" font-size="11.5" fill="#1f2937">Facilities (IN·US·EU) · Ember (carbon + fuel mix) · AWARE (basin CF) · GEM (power plants) · Macknick (EWIF) · GADM · CGWB (groundwater)</text>
+
+  <!-- L1 -->
+  <rect x="30" y="156" width="940" height="38" rx="7" fill="#eef2f7" stroke="#475569" stroke-width="1.2"/>
+  <text x="48" y="173" font-size="12.5" fill="#111827"><tspan font-weight="700">L1  GEO LINKAGE</tspan></text>
+  <text x="48" y="188" font-size="11.5" fill="#1f2937">facility → AWARE basin (point-in-polygon) + grid zone   ·   exact incidence matrices  A_zone / A_basin</text>
+
+  <!-- L2 -->
+  <rect x="30" y="208" width="940" height="50" rx="7" fill="#e7f1ea" stroke="#2f855a" stroke-width="1.6"/>
+  <text x="48" y="227" font-size="12.5" fill="#111827"><tspan font-weight="700">L2  ACCOUNT  (facility-month)  ★ the dataset</tspan></text>
+  <text x="48" y="243" font-size="11.5" fill="#1f2937">Carbon = E_grid · CI(zone, month)   ·   Water = scope-1 (WUE·E_IT) + scope-2 (EWIF @ generation basins)   ·   × AWARE CF → scarcity-weighted</text>
+  <text x="757" y="243" font-size="11" fill="#2f855a" font-weight="600">· L2.5 calibrate</text>
+
+  <!-- feeders -->
+  <rect x="30" y="286" width="300" height="66" rx="7" fill="#eef2f7" stroke="#475569" stroke-width="1.2"/>
+  <text x="180" y="305" text-anchor="middle" font-size="12.5" font-weight="700" fill="#111827">L3  PROJECT</text>
+  <text x="180" y="322" text-anchor="middle" font-size="11" fill="#1f2937">grid-CI forecast (SARIMA / naive)</text>
+  <text x="180" y="337" text-anchor="middle" font-size="11" fill="#1f2937">recharge R̂ · 2030/50 scenarios</text>
+  <text x="180" y="351" text-anchor="middle" font-size="10" fill="#6b7280">simple ≥ complex (null)</text>
+
+  <rect x="350" y="286" width="300" height="66" rx="7" fill="#eef2f7" stroke="#475569" stroke-width="1.2"/>
+  <text x="500" y="305" text-anchor="middle" font-size="12.5" font-weight="700" fill="#111827">L4  COUPLING</text>
+  <text x="500" y="322" text-anchor="middle" font-size="11" fill="#1f2937">exact incidence (A_zone, A_basin)</text>
+  <text x="500" y="337" text-anchor="middle" font-size="11" fill="#1f2937">basin / grid shared-load maps</text>
+  <text x="500" y="351" text-anchor="middle" font-size="10" fill="#6b7280">GNN dropped — null</text>
+
+  <rect x="670" y="286" width="300" height="66" rx="7" fill="#eef2f7" stroke="#475569" stroke-width="1.2"/>
+  <text x="820" y="305" text-anchor="middle" font-size="12.5" font-weight="700" fill="#111827">L5  POLICY-GAP</text>
+  <text x="820" y="322" text-anchor="middle" font-size="11" fill="#1f2937">registry → 4-axis gap (0/4 mandated)</text>
+  <text x="820" y="337" text-anchor="middle" font-size="11" fill="#1f2937">+ binding constraints (→ Q1/Q3)</text>
+  <text x="820" y="351" text-anchor="middle" font-size="10" fill="#6b7280">RAG = frozen corroboration audit</text>
+
+  <!-- decisions -->
+  <rect x="30" y="382" width="300" height="84" rx="7" fill="#e6edfb" stroke="#2563eb" stroke-width="1.8"/>
+  <text x="180" y="402" text-anchor="middle" font-size="13" font-weight="700" fill="#1e3a8a">Q1  SITING</text>
+  <text x="180" y="420" text-anchor="middle" font-size="11" fill="#1f2937">where to build a new DC</text>
+  <text x="180" y="436" text-anchor="middle" font-size="11" fill="#1f2937">basin×state · minimax regret</text>
+  <text x="180" y="452" text-anchor="middle" font-size="11" fill="#1f2937">· legal screen · 2030/50</text>
+
+  <rect x="350" y="382" width="300" height="84" rx="7" fill="#e6edfb" stroke="#2563eb" stroke-width="1.8"/>
+  <text x="500" y="402" text-anchor="middle" font-size="13" font-weight="700" fill="#1e3a8a">Q2  SCORECARD + EQUITY</text>
+  <text x="500" y="420" text-anchor="middle" font-size="11" fill="#1f2937">which existing DCs harm</text>
+  <text x="500" y="436" text-anchor="middle" font-size="11" fill="#1f2937">per-facility + C7 groundwater</text>
+  <text x="500" y="452" text-anchor="middle" font-size="11" fill="#1f2937">(63% on over-exploited aquifers)</text>
+
+  <rect x="670" y="382" width="300" height="84" rx="7" fill="#e6edfb" stroke="#2563eb" stroke-width="1.8"/>
+  <text x="820" y="402" text-anchor="middle" font-size="13" font-weight="700" fill="#1e3a8a">Q3  ROUTING</text>
+  <text x="820" y="420" text-anchor="middle" font-size="11" fill="#1f2937">how to shift flexible load</text>
+  <text x="820" y="436" text-anchor="middle" font-size="11" fill="#1f2937">Lyapunov controller (agents)</text>
+  <text x="820" y="452" text-anchor="middle" font-size="11" fill="#1f2937">vs static / greedy / MILP</text>
+
+  <!-- cross-cutting -->
+  <rect x="30" y="492" width="455" height="34" rx="6" fill="#f3f4f1" stroke="#6b7280" stroke-width="1.1"/>
+  <text x="257" y="513" text-anchor="middle" font-size="11.5" fill="#1f2937"><tspan font-weight="700">L8  UNCERTAINTY</tspan>  —  Monte-Carlo + Sobol (wraps all)</text>
+  <rect x="515" y="492" width="455" height="34" rx="6" fill="#f3f4f1" stroke="#6b7280" stroke-width="1.1"/>
+  <text x="742" y="513" text-anchor="middle" font-size="11.5" fill="#1f2937"><tspan font-weight="700">L9  OUTPUTS</tspan>  —  maps · tables · exhibits · open data + code</text>
+
+  <!-- arrows -->
+  <g stroke="#6b7280" stroke-width="1.6" fill="none">
+    <line x1="500" y1="88" x2="500" y2="100" marker-end="url(#ar)"/>
+    <line x1="500" y1="142" x2="500" y2="156" marker-end="url(#ar)"/>
+    <line x1="500" y1="194" x2="500" y2="208" marker-end="url(#ar)"/>
+    <!-- L2 fan to feeders -->
+    <line x1="500" y1="258" x2="180" y2="286" marker-end="url(#ar)"/>
+    <line x1="500" y1="258" x2="500" y2="286" marker-end="url(#ar)"/>
+    <line x1="500" y1="258" x2="820" y2="286" marker-end="url(#ar)"/>
+    <!-- feeders to decisions (each decision draws on the account + the feeders it needs) -->
+    <line x1="180" y1="352" x2="180" y2="382" marker-end="url(#ar)"/>
+    <line x1="500" y1="352" x2="500" y2="382" marker-end="url(#ar)"/>
+    <line x1="820" y1="352" x2="820" y2="382" marker-end="url(#ar)"/>
+    <!-- decisions to outputs -->
+    <line x1="180" y1="466" x2="200" y2="492" marker-end="url(#ar)"/>
+    <line x1="500" y1="466" x2="430" y2="492" marker-end="url(#ar)"/>
+    <line x1="820" y1="466" x2="742" y2="492" marker-end="url(#ar)"/>
+  </g>
+
+  <!-- footer finding -->
+  <text x="500" y="548" text-anchor="middle" font-size="11" fill="#374151">Routing is two-sided:  US co-benefit (−29% water, −10% carbon)   vs   India trade-off (−22% water, +1.4% carbon; can't clear the overdraft).</text>
+  <text x="500" y="566" text-anchor="middle" font-size="11" fill="#374151">Policy: 0/4 axes mandated → 100% of burden in a regulatory blind spot.   Account: India 3.63 Mt CO₂ / 846.6 M m³-eq · US 16 Mt / 2.51 bn · EU 3.35 Mt / 137 M.</text>
+</svg>
