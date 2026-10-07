@@ -27,7 +27,7 @@ Branch `feat/us-eu`. Ranked by value to the Q1 journal paper. Each "why" ties to
      demonstrably flexible"). → flexibility is real and substantial; the exact shiftable fraction is
      workload-dependent (batch/training » interactive), so keep the **sweep** as the headline and report 30% as a
      central case, not a hard number.
-   - *Effort:* low-medium (the citing/framing is done; the code change is the coauthor's on the routing core).
+   - *Effort:* low-medium (the citing/framing is done; the code change is on the routing core).
 
 3. **India consumption-based carbon (Electricity Maps / EnergyMap).**
    - *Why:* removes the standing R2 generation-vs-consumption caveat; sharpens the India numbers.

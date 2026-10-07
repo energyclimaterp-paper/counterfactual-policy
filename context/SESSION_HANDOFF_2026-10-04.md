@@ -7,7 +7,7 @@
 > `q2_equity_groundwater.md`).
 
 ## 0. TL;DR
-- Work this session is on branch **`feat/policy-registry`** (isolated off `feat/us-eu`, **pushed**). Merge is the coauthor's step.
+- Work this session is on branch **`feat/policy-registry`** (isolated off `feat/us-eu`, **pushed**).
 - Did: policy L5 cleaned to one derived registry; RAG evaluated + scoped (not the backbone); forecasting
   "simple beats complex" exhibit; cross-region synthesis; C7 groundwater-equity overlay; Co-RE reviews logged;
   current architecture diagram (`dcfootprint/docs/architecture_v2.svg`).
@@ -29,9 +29,8 @@
 - **RAG decision:** evaluated on real retrieval — corpus is **86% EU, India-starved** (Rajasthan ZLD
   unretrievable; scanned PDF), and **missing the four "closest instruments"** the matrix needs. → **NOT the policy
   backbone**; kept as a frozen corroboration exhibit (`rag_axis_audit.md`); **not expanded** (over-engineering trap).
-- **Authorship (resolved):** it's a **team**, not solo — advisor **Ying** (Ying-Jung Chen), coauthor **Samiksha**
-  (does most of the build via her own Claude on `D:\3Gtech_paper - GNN`). The `context/` docs that say "solo author"
-  are inaccurate.
+- **Authorship (resolved):** it's a **team**, not solo — advisor **Ying** (Ying-Jung Chen) and coauthor
+  **Samiksha**. The `context/` docs that say "solo author" are inaccurate.
 - **Git workflow:** `feat/us-eu` is canonical (coauthor's, **force-pushed**). **Never commit onto it** — branch in
   isolation and push that. `main` lacks the pipeline. History was rewritten 2026-09-27 (`COMMIT_HASH_MAP.md`).
 
@@ -63,10 +62,10 @@
 - **cross-cutting** → uncertainty/Sobol (C9); maps/figures/open code = the instrument (C8).
 
 ## 5. What's left (runs + backlog — full list in `PIPELINE_IMPROVEMENTS.md`)
-- **Round-4 canonical run** (India+US+EU) → locks US/EU canonical. *Coauthor's (needs her `.venv` + data).*
+- **Round-4 canonical run** (India+US+EU) → locks US/EU canonical. *Runs on this machine (python 3.14 + full stack; `data/` present).*
 - **India consumption-carbon re-run** once the Electricity Maps API is wired (being arranged).
 - **Routing hardening** — lead with the sweep + cite the flexible-share (citations already in the backlog); code
-  change is on the coauthor's routing core.
+  change is on the routing core.
 - **Merge `feat/policy-registry`** into `feat/us-eu`.
 - **Team decisions:** paper format (full article vs perspective) + lead-framing + reconcile the RQ set, then draft.
 - *Optional:* live-RAG expansion (OCR Rajasthan + corpus), near-submission novelty refresh, registry URL polish,

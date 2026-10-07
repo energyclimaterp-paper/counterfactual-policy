@@ -213,7 +213,7 @@ Full (legacy) blueprint in `ARCHITECTURE.md` (+ `architecture_diagram.svg/.png`)
 | `00_PROJECT_STATE.md` | **this file** — state, decisions, rationale, corrections, log (read first) |
 | **`../dcfootprint/ARCHITECTURE.md`** | **AUTHORITATIVE architecture + TIERED contributions (§7) + risk register (§6)** — read for the build & the contribution statement |
 | **`../dcfootprint/README.md`** + `docs/architecture_flow.svg` | package overview + data-flow diagram |
-| `ARCHITECTURE.md` (context/) | *legacy* S0–S11 blueprint — superseded by `dcfootprint/ARCHITECTURE.md` (reference only) |
+| `archive/ARCHITECTURE_legacy_S0-S11.md` | *legacy* S0–S11 blueprint — superseded by `dcfootprint/ARCHITECTURE.md` (reference only) |
 | `LIT_REVIEW_VERIFIED.md` | **AUTHORITATIVE literature review** — 89 works, one-per-entry, 6-axis deltas, nearest-neighbour analysis, GNN cluster verdict (complete 2026-09-22) |
 | `RESEARCH_GAPS.md` | gap re-examination + §P problem/purpose + §A chosen direction (contributions here SUPERSEDED by `dcfootprint/ARCHITECTURE.md §7`) |
 | `POLICY_DEEP_DIVE.md` | US/EU/India regulatory baseline for S10 (four-axis gap) |

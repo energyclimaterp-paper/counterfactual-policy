@@ -13,10 +13,11 @@ research instrument behind a paper for the Elsevier *Energy and Climate Change* 
 | If you want to... | Read |
 |---|---|
 | understand the project in 5 minutes | this file |
-| know exactly what is built, the decisions and the results | [`context/SESSION_HANDOFF_2026-09-27.md`](context/SESSION_HANDOFF_2026-09-27.md) |
+| understand the results | [`dcfootprint/results/README.md`](dcfootprint/results/README.md) (one page), then [`cross_region_summary.md`](dcfootprint/results/cross_region_summary.md) |
+| know what is built, the decisions and the current state | [`context/SESSION_HANDOFF_2026-10-04.md`](context/SESSION_HANDOFF_2026-10-04.md) (latest), [`context/SESSION_HANDOFF_2026-09-27.md`](context/SESSION_HANDOFF_2026-09-27.md) (code map) |
 | know why the project is shaped this way | [`context/00_PROJECT_STATE.md`](context/00_PROJECT_STATE.md) |
 | find your way around the code | [`dcfootprint/README.md`](dcfootprint/README.md) |
-| see the numbers | [`dcfootprint/results/round3_final/`](dcfootprint/results/round3_final/) (India, canonical) and `dcfootprint/results/RESULTS_FULL.md` (latest run) |
+| quote canonical India numbers | [`dcfootprint/results/round3_final/`](dcfootprint/results/round3_final/) (tag `round3-final`) |
 | see the forecasting benchmark | [`runs/fresh_run_core_grid_2026-09-28/report/RUN_SUMMARY.md`](runs/fresh_run_core_grid_2026-09-28/report/RUN_SUMMARY.md) (every model, Co-RE grid) and [`runs/fresh_run_dcf_grid_2026-09-28/`](runs/fresh_run_dcf_grid_2026-09-28/) (pipeline zones) |
 | know where each dataset comes from | [`context/DATA.md`](context/DATA.md) |
 
@@ -97,19 +98,20 @@ Nothing is merged into `main` yet; it will be after the round-4 canonical run.
 │   ├── data/
 │   │   ├── india_dc_facilities.psv            # same list, plain text
 │   │   └── India_DC_Facilities_v0.xlsx        # the open India datacenter list (194 rows) - a contribution
-│   ├── 00_PROJECT_STATE.md                    # READ FIRST: direction, locked decisions, RQs
-│   ├── ARCHITECTURE.md                        # original research architecture (stages S0-S11)
-│   ├── architecture_diagram.png               # architecture diagram
-│   ├── architecture_diagram.svg               # architecture diagram (vector)
+│   ├── archive/                               # superseded: legacy S0-S11 architecture + old diagrams
+│   ├── 00_PROJECT_STATE.md                    # direction, locked decisions, RQs (some pre-v2 sections)
 │   ├── CFP_RECORD.md                          # the journal call for papers
 │   ├── COMMIT_HASH_MAP.md                     # old -> new commit hashes (history rewrite 2026-09-27)
+│   ├── CORE_REVIEWS_AND_LESSONS.md            # NeurIPS Co-RE reviews, verbatim + lessons for this paper
 │   ├── DATA.md                                # every dataset: source, granularity, join key, what is on disk
 │   ├── GNN_AUTOPSY.md                         # why the earlier GNN approach was dropped
 │   ├── lit_review_coding_sheet.xlsx           # coded literature (84 papers)
 │   ├── LIT_REVIEW_VERIFIED.md                 # verified literature review
+│   ├── PIPELINE_IMPROVEMENTS.md               # prioritised backlog (what to do next, and why)
 │   ├── POLICY_DEEP_DIVE.md                    # regulation across India / US / EU
-│   ├── RESEARCH_GAPS.md                       # gap analysis behind the contributions
-│   └── SESSION_HANDOFF_2026-09-27.md          # code as built, decisions + evidence, results, next actions
+│   ├── RESEARCH_GAPS.md                       # gap analysis behind the contributions (some pre-v2 sections)
+│   ├── SESSION_HANDOFF_2026-09-27.md          # code as built, decisions + evidence, results
+│   └── SESSION_HANDOFF_2026-10-04.md          # latest state: policy/RAG/forecast work, round 4, what's left
 ├── dcfootprint/                               # the pipeline: Python package and its config
 │   ├── config/                                # every assumption lives here, never in code
 │   │   ├── datasets.yaml                      # dataset registry: path, granularity, join key, role
@@ -122,12 +124,15 @@ Nothing is merged into `main` yet; it will be after the round-4 canonical run.
 │   ├── experiments/                           # scripts outside the pipeline (see its README)
 │   │   ├── README.md                          # what each script does
 │   │   └── *.py                               # 15 files
-│   ├── results/                               # outputs of the latest run (regenerated; not canonical)
-│   │   ├── round2_final/                      # FROZEN round-2 snapshot (do not edit)
-│   │   ├── round3_final/                      # FROZEN canonical India snapshot, tag round3-final (numbers to quote)
-│   │   ├── RESULTS.md                         # short results summary
-│   │   ├── RESULTS_FULL.md                    # full results report (all layers)
-│   │   └── *.csv, *.json                      # 18 files
+│   ├── results/                               # outputs + the curated synthesis (start at results/README.md)
+│   │   ├── README.md                          # READ FIRST: results overview, every RQ -> headline -> trust
+│   │   ├── cross_region_summary.md            # three-region synthesis, numbers mapped to RQs
+│   │   ├── rag_axis_audit.md .. q2_equity_groundwater.md  # standalone exhibits (RAG, forecast, equity)
+│   │   ├── round3_final/                      # FROZEN canonical India snapshot, tag round3-final (quote these)
+│   │   ├── round2_final/                      # superseded round-2 snapshot (feeds round3_report.py)
+│   │   ├── us/, eu/                           # latest US / EU region outputs
+│   │   ├── RESULTS.md, RESULTS_FULL.md        # auto-written latest India run summary / full report
+│   │   └── *.csv, *.json                      # latest India run outputs (regenerated)
 │   ├── src/
 │   │   └── dcfootprint/
 │   │       ├── account/                       # L2 account
@@ -195,9 +200,12 @@ dated folder.
 ## Status
 
 All layers run end to end for India and the US, and for the EU at country level (no routing: no site
-locations). 89 tests pass. Still open: real multi-agent Nexus forecasting, the live legal retrieval (RAG), a
-GNN target, a 2030/2050 carbon path, and the round-4 canonical run. The full list, in priority order, is §8
-of the [session handoff](context/SESSION_HANDOFF_2026-09-27.md).
+locations); the test suite passes. **Round 4 (2026-10-06): all three regions re-run clean and reproduce the
+canonical results — India identical to `round3-final` to machine precision, US data byte-identical, EU
+complete.** Still open: real multi-agent Nexus forecasting, the live legal retrieval (RAG), a GNN target, a
+2030/2050 carbon path, and India consumption-based carbon (Electricity Maps). Backlog in priority order:
+[`context/PIPELINE_IMPROVEMENTS.md`](context/PIPELINE_IMPROVEMENTS.md); current state:
+[`context/SESSION_HANDOFF_2026-10-04.md`](context/SESSION_HANDOFF_2026-10-04.md).
 
 ## Built with
 
