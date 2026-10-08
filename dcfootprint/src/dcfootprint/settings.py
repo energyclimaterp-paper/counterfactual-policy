@@ -96,6 +96,7 @@ class Override(_M):
 
 class Grid(_M):
     zone: Literal["state", "national"]
+    carbon_basis: Literal["generation", "consumption"] = "generation"
     account_year: int = Field(ge=2019, le=2025)
     gem_path: str
     gadm_path: str

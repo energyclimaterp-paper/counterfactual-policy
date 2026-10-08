@@ -69,6 +69,10 @@ water_grid:               # scope-2 EWIF = sum(fuel_share * macknick_coeff)
 # CEA national-annual EF is kept only as a cross-check when data/cea/ is present.
 grid:
   zone: state
+  # India carbon basis: generation = Ember state own-generation mix (R2 caveat); consumption =
+  # Electricity Maps regional flow-traced (import-adjusted) CI, which removes R2. Falls back to
+  # generation if the EM key/cache is absent. US/EU unaffected (EM covers India zones only).
+  carbon_basis: consumption
   account_year: 2024
   gem_path: "data/gem/Global-Integrated-Power-March-2026-II.xlsx"
   gadm_path: "data/gadm/gadm41_IND.gpkg"     # GADM 4.1, layer ADM_ADM_1, field NAME_1
