@@ -10,8 +10,6 @@ CGWB "Stage of GW extraction (%)": >100 = over-exploited (drawing beyond recharg
 """
 from __future__ import annotations
 
-import re
-
 import numpy as np
 import pandas as pd
 
@@ -59,18 +57,27 @@ def load_cgwb_stage() -> tuple[dict, dict]:
     return {k: v for k, v in city_map.items() if k}, {k: v for k, v in state_map.items() if k}
 
 
-def equity_overlay(account: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+def attach_gw_stage(df: pd.DataFrame) -> pd.DataFrame:
+    """Add gw_stage_pct / gw_stage_source / gw_category by matching each row's city
+    (alias-normalised, CGWB major-cities) else its state to the CGWB stage of extraction.
+    India only. Shared with the Q2 scorecard so Q2 carries the groundwater dimension."""
     city_map, state_map = load_cgwb_stage()
+    out = df.copy()
+    cnorm = _norm(out["city"]).replace(_CITY_ALIASES)
+    snorm = _norm(out["state"])
+    out["gw_stage_pct"] = [city_map.get(c, np.nan) for c in cnorm]
+    out["gw_stage_source"] = np.where(out["gw_stage_pct"].notna(), "city", "")
+    miss = out["gw_stage_pct"].isna()
+    out.loc[miss, "gw_stage_pct"] = [state_map.get(s, np.nan) for s in snorm[miss]]
+    out.loc[miss & out["gw_stage_pct"].notna(), "gw_stage_source"] = "state"
+    out["gw_category"] = out["gw_stage_pct"].map(categorise)
+    return out
+
+
+def equity_overlay(account: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     ann = account.groupby(["facility_id", "operator", "city", "state"], as_index=False).agg(
         scarcity_m3eq_yr=("water_scarcity_l_eq", lambda s: s.sum() / 1000.0))
-    cnorm = _norm(ann["city"]).replace(_CITY_ALIASES)
-    snorm = _norm(ann["state"])
-    ann["gw_stage_pct"] = [city_map.get(c, np.nan) for c in cnorm]
-    ann["gw_stage_source"] = np.where(ann["gw_stage_pct"].notna(), "city", "")
-    miss = ann["gw_stage_pct"].isna()
-    ann.loc[miss, "gw_stage_pct"] = [state_map.get(s, np.nan) for s in snorm[miss]]
-    ann.loc[miss & ann["gw_stage_pct"].notna(), "gw_stage_source"] = "state"
-    ann["gw_category"] = ann["gw_stage_pct"].map(categorise)
+    ann = attach_gw_stage(ann)
 
     tot = ann["scarcity_m3eq_yr"].sum()
     by_cat = ann.groupby("gw_category")["scarcity_m3eq_yr"].sum()

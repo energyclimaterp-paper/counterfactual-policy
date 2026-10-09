@@ -48,6 +48,11 @@ def scorecard(account: pd.DataFrame) -> pd.DataFrame:
 
     hard = HARD_CONSTRAINTS[HARD_CONSTRAINTS["type"] == "hard"].groupby("region")["rule"].apply("; ".join)
     ann["legal_obligations"] = ann["state"].map(hard).fillna("none (no hard rule in the regulation matrix)")
+
+    region = str(account["region"].iloc[0]) if "region" in account.columns and len(account) else ""
+    if region == "India":                               # fuse the C7 groundwater-equity dimension into Q2
+        from dcfootprint.decisions.equity import attach_gw_stage
+        ann = attach_gw_stage(ann)
     return ann.sort_values("scarcity_m3eq_yr", ascending=False).reset_index(drop=True)
 
 

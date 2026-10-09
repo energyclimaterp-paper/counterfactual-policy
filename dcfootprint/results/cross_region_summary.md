@@ -64,5 +64,16 @@ is two-sided — load-routing is a co-benefit where there's slack (US) but only 
 basins are already in deficit (India), so siting and binding limits are needed.*
 
 ## Caveats to state
-US/EU are current but not yet canonical (round-4 pending); India carbon is generation-based; coverage is partial
-(US ~30%, EU ~36%); Q3 routing uses stylised demand + an assumed flexible share (bounded by a sweep).
+US/EU are current; India carbon is now **consumption-based** (Electricity Maps regional, import-adjusted;
+generation is the stated sensitivity); coverage is partial (US ~30%, EU ~36%); Q3 routing uses stylised demand
++ an assumed flexible share (bounded by a sweep).
+
+## 2026-10-10 updates (consumption carbon · seasonal · equity fusion)
+- **India carbon consumption-based (closes R2):** national total within **+0.2%** of generation, but
+  sub-national carbon re-ranks ±20–40% (Bengaluru **+37%**, Delhi +39%, Gujarat +34%, TN +9%; UP **−28%**,
+  Telangana −20%) → a positive *carbon* re-ranking instance for RQ2 (the water re-ranking was a near-null).
+- **Seasonal (C3, *when*):** India carbon + scarcity **co-peak in March** (dry pre-monsoon; top-3 months = 38%
+  of annual scarcity water); US co-peaks in summer (corr +0.62); **EU anti-correlated** (water Aug, carbon Jan,
+  corr −0.49), so a seasonal lever cannot serve both axes in the EU. See `seasonal_profile.md`.
+- **Q2 fused with equity:** the scorecard now carries each facility's groundwater stage (`gw_stage_pct`,
+  `gw_category`) — Bengaluru = scarcity pctile 100 on a 187%-over-exploited aquifer.

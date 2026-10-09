@@ -17,13 +17,16 @@ which existing DCs do the most harm, **Q3** whether shifting flexible load betwe
 | RQ | Headline | What it means | How much to trust it |
 |----|----------|---------------|----------------------|
 | **RQ1** magnitude & where | India **3.63 Mt CO₂** + **846.6 M m³-eq** water/yr · US **16.0 Mt** / **2.51 bn** · EU **3.35 Mt** / **137 M** | the footprint is large and sits in water-stressed basins | absolutes are calibrated ranges (India within ~8% of CEEW); **lead with *where*, not *how much*** |
-| **RQ2** does the method matter | **60–82%** of the scarcity burden is **scope-2** (at the power plants, not the DC) | on-site-only accounting misses most of it; annual re-ranking is modest (the DCs already sit in the stressed basins) | **robust** (structural; a global util/PUE scalar cancels) |
+| **RQ2** does the method matter | **water:** 60–82% of the scarcity burden is **scope-2** (at the power plants, not the DC). **carbon:** consumption-basis (import-adjusted) re-ranks states by ±20–40% (Bengaluru +37%, UP −28%) though the national total barely moves (+0.2%) | the method changes the *spatial* answer on **both** axes — on-site-only water misses most of it, and generation-basis mis-attributes sub-national carbon | **robust** (both structural; the global util/PUE scalar cancels) |
 | **RQ3** is it regulated | **0 of 4 axes** mandated in any of the three regions → **100% of burden in a blind spot** | nothing requires measuring carbon-intensity, marginal carbon, scarcity-water, or inference | **robust** (derived from a 26-instrument registry, no assumptions) |
 | **RQ4** what helps | routing is **two-sided**: US **−29% water & −10% carbon**; India **−22% water but +1.4% carbon**, and a 34-month overdraft it cannot clear | load-shifting is a co-benefit where there is slack, a trade-off where basins are already dry → **siting + binding limits are needed, not just shifting** | routing **robust across the sweeps**; lever *absolutes* are conditional scenarios |
 
-Equity diagnostic: **63% of India's DC water burden lands on already over-exploited aquifers**
-(Bengaluru, Chennai). Forecasting (a support layer, **not** a contribution): **simple ≥ complex** — the deep
-net is worst, no model meaningfully beats seasonal-naive.
+Equity diagnostic (now fused into Q2): **63% of India's DC water burden lands on already over-exploited
+aquifers** (Bengaluru 187%, Chennai 125%) — the Q2 scorecard carries each facility's `gw_stage_pct` + `gw_category`.
+Seasonal (**C3, *when***): India's carbon and scarcity **co-peak in March** (dry pre-monsoon; top-3 months hold
+38% of annual scarcity water), the US co-peaks in summer, but the **EU is anti-correlated** (water Aug, carbon
+Jan) so a seasonal lever helps one axis and hurts the other (`seasonal_profile.md`). Forecasting (a support
+layer, **not** a contribution): **simple ≥ complex** — the deep net is worst, no model beats seasonal-naive.
 
 ### Per-region account (RQ1 detail)
 
@@ -33,6 +36,10 @@ net is worst, no model meaningfully beats seasonal-naive.
 | Scarcity-weighted water | 846.6 M m³-eq | 2.51 bn m³-eq | 137 M m³-eq |
 | Scope-2 share of scarcity water | 60% | 68% | 82% |
 | Lever that pays most | ZLD 37% (≈ efficiency, but +19% carbon) | efficiency 31% / ZLD 29% | ZLD 16% |
+
+*India carbon is **consumption-based** (Electricity Maps regional, import-adjusted; `grid.carbon_basis: consumption`),
+which closes the R2 generation-vs-consumption caveat; generation basis is the stated sensitivity. The national
+total is within +0.2% of generation; the change is in the sub-national distribution.*
 
 ## Routing robustness (RQ4 — the most attackable assumption)
 
@@ -53,8 +60,9 @@ basins are already dry.
 **Curated — read these:**
 - `README.md` (this) — the results overview.
 - `cross_region_summary.md` — the three-region synthesis; every number mapped to an RQ.
-- `rag_axis_audit.md` · `forecast_simple_vs_complex.md` · `q2_equity_groundwater.md` — the standalone
-  exhibits (RAG corroboration of the gap, the forecasting null, the groundwater-equity finding).
+- `rag_axis_audit.md` · `forecast_simple_vs_complex.md` · `seasonal_profile.md` · `q2_equity_groundwater.md`
+  — the standalone exhibits (RAG corroboration of the gap, the forecasting null, the seasonal *when* finding,
+  the groundwater-equity summary; the per-facility equity detail is now fused into `q2_scorecard.csv`).
 
 **Canonical snapshots — quote from these:**
 - `round3_final/` — **FROZEN canonical India run** (git tag `round3-final`). The India numbers above come
@@ -70,10 +78,10 @@ basins are already dry.
   uncertainty, report, figures).
 - `figures/` — India figures (US / EU figures are under `us/figures/`, `eu/figures/`).
 
-## Reproducibility (round 4, 2026-10-06)
+## Reproducibility & current state (2026-10-10)
 
-All three regions run clean on the current code and reproduce the canonical/committed results:
-**India 14/14 stages, identical to `round3-final` to machine precision; EU 8/8; US 10/10, every data CSV
-byte-identical** (only a previously-`null` CEA cross-check is now filled, because this machine has the CEA
-files). Dataset sources are in `context/DATA.md`; the three large inputs a fresh clone must fetch separately
-are listed there.
+All three regions run clean on the current code: **India 14/14 · US 10/10 · EU 8/8.** The account reproduces
+`round3-final` to machine precision on the **generation** carbon basis; the default India run now uses the
+**consumption** basis (Electricity Maps), which leaves the national total within +0.2% but re-ranks sub-national
+carbon (Bengaluru +37%, UP −28%). Dataset sources are in `context/DATA.md`; the large inputs a fresh clone must
+fetch (incl. the Electricity Maps key for consumption carbon) are listed there.
